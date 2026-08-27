@@ -30,22 +30,68 @@ tags:
 - digital-goods
 - reseller-api
 apis:
-- aid: mystars.tg:faas:v1
-  name: MyStars FaaS — Fulfilment API
-  description: Pricing, recipient eligibility checks and the full order lifecycle for Telegram Stars & Premium.
+- aid: mystars:mystars-mystars-faas-fulfilment-api-api
+  name: MyStars FaaS MyStars FaaS — Fulfilment API
+  description: >-
+    The MyStars FaaS — Fulfilment API API from MyStars FaaS — 0 operation(s) for mystars faas — fulfilment
+    api.
   humanURL: https://mystars.tg/docs
   baseURL: https://api.mystars.tg
   tags:
-  - telegram
-  - payments
-  - crypto
+  - MyStars FaaS — Fulfilment API
   properties:
+  - type: OpenAPI
+    url: openapi/mystars-mystars-faas-fulfilment-api-api-openapi.yml
   - type: Documentation
     url: https://mystars.tg/docs
+  - type: SignUp
+    url: https://t.me/my_stars_tg_bot
+  - type: LLMsTxt
+    url: https://mystars.tg/llms.txt
+- aid: mystars:mystars-orders-api
+  name: MyStars FaaS Orders API
+  description: Create, inspect, list and cancel fulfilment orders.
+  humanURL: https://mystars.tg/docs
+  baseURL: https://api.mystars.tg
+  tags:
+  - Orders
+  properties:
   - type: OpenAPI
-    url: https://mystars.tg/openapi.json
+    url: openapi/mystars-orders-api-openapi.yml
+  - type: Documentation
+    url: https://mystars.tg/docs
+  - type: SignUp
+    url: https://t.me/my_stars_tg_bot
+  - type: LLMsTxt
+    url: https://mystars.tg/llms.txt
+- aid: mystars:mystars-pricing-api
+  name: MyStars FaaS Pricing API
+  description: Quote a price; list supported payment currencies and products.
+  humanURL: https://mystars.tg/docs
+  baseURL: https://api.mystars.tg
+  tags:
+  - Pricing
+  properties:
   - type: OpenAPI
-    url: openapi/mystars-faas-openapi.json
+    url: openapi/mystars-pricing-api-openapi.yml
+  - type: Documentation
+    url: https://mystars.tg/docs
+  - type: SignUp
+    url: https://t.me/my_stars_tg_bot
+  - type: LLMsTxt
+    url: https://mystars.tg/llms.txt
+- aid: mystars:mystars-recipients-api
+  name: MyStars FaaS Recipients API
+  description: Resolve a recipient and check delivery eligibility before ordering.
+  humanURL: https://mystars.tg/docs
+  baseURL: https://api.mystars.tg
+  tags:
+  - Recipients
+  properties:
+  - type: OpenAPI
+    url: openapi/mystars-recipients-api-openapi.yml
+  - type: Documentation
+    url: https://mystars.tg/docs
   - type: SignUp
     url: https://t.me/my_stars_tg_bot
   - type: LLMsTxt
