@@ -1,0 +1,82 @@
+generated: '2026-08-27'
+method: searched
+source: openapi/mystars-faas-openapi.json (webhooks block) + https://mystars.tg/docs
+docs: https://mystars.tg/docs
+note: >-
+  MyStars publishes NO AsyncAPI document — probed /asyncapi.yaml and /asyncapi.json on both hosts
+  during discovery and found nothing, and none exists in the GitHub account. What it DOES publish
+  is a first-class webhook contract inside the OpenAPI 3.1 webhooks block, which is the modern
+  in-spec way to declare one. Captured here as a webhook catalog; no AsyncAPI has been
+  fabricated. asyncapi_present is honestly false; a webhook surface is honestly present.
+asyncapi_published: false
+webhooks_published: true
+subscription_model:
+  style: per-order callback
+  registration: >-
+    There is NO "register webhook" endpoint and no global subscription. Each order carries its
+    own optional callback_url, passed in the POST /v1/orders body, and the terminal event is
+    POSTed to exactly that URL. Omit it and poll GET /v1/orders/{id} instead.
+  callback_url_constraints: >-
+    Must be a publicly reachable https:// URL. Loopback addresses, private-network hosts and
+    non-HTTPS schemes are rejected with 400 bad_request. Redirects are NOT followed — the
+    callback_url must be the final destination.
+event_count: 1
+events:
+- name: orderStatus
+  operationId: orderStatusWebhook
+  transport: HTTPS POST
+  content_type: application/json
+  fires_on: an order reaching a terminal status
+  statuses: [delivered, failed, reversed, expired]
+  payload_fields:
+    order_id: uuid — the order, and also the on-chain payment memo
+    status: one of delivered / failed / reversed / expired
+    failure_reason: >-
+      Null on delivered. Otherwise underpaid / overpaid / no_memo / wrong_memo (failed, funds
+      reversed), undeliverable (reversed, funds reversed), or expired.
+    purchase_tx: on-chain reference for the fulfilment purchase, when delivered
+    reversal_tx: on-chain reference for returned funds, when reversed
+  required_fields: [order_id, status]
+  see: errors/mystars-decline-codes.yml
+  history: >-
+    v1.3.0 (2026-06-21) added the terminal failed and expired events; before that only delivered
+    and reversed fired.
+security:
+  signature_header: X-Faas-Signature
+  algorithm: HMAC-SHA256, hex encoded
+  signed_over: the EXACT raw request body
+  secret: >-
+    A per-tenant webhook signing secret, a credential SEPARATE from the API key. Shown once
+    alongside the API key on /api_start in @my_stars_tg_bot.
+  rotation:
+    command: /api_rotate_webhook
+    window: 24 hours
+    behaviour: >-
+      During the rollover window X-Faas-Signature may carry MULTIPLE comma-separated signatures
+      (the new and the previous secret). Treat the header as a comma-separated list and accept if
+      ANY entry matches. Outside a rotation it is a single value, so naive single-value
+      verification keeps working day to day — which is precisely why an integrator who never
+      reads this note will break exactly once, during their first rotation.
+    note: >-
+      /api_rotate rotates the API KEY only and does not touch the webhook secret. Two credentials,
+      two rotation commands.
+delivery:
+  acknowledgement: any 2xx stops retries
+  timeout: 5 seconds (connect, headers and body each)
+  redirects: not followed
+  retries: exponential backoff, then dead-lettered
+  ordering: not guaranteed (not documented)
+  replay_stability: the body and its signature are stable across retries
+  failure_isolation: >-
+    A timeout or non-2xx triggers the retry / dead-letter path exactly as a connection error
+    would; it never blocks order processing.
+  at_least_once: true
+polling_alternative:
+  operationId: getOrder
+  path: GET /v1/orders/{id}
+  note: >-
+    A fully supported alternative — the webhook is optional. An agent with no public HTTPS
+    endpoint can operate entirely on polling, subject to the order-lifecycle rate-limit bucket.
+sdk_support: >-
+  Both official SDKs ship webhook verification, and @mystars-tg/faas-cli can verify a captured
+  X-Faas-Signature offline against a raw body.

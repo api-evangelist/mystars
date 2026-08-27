@@ -1,0 +1,47 @@
+generated: '2026-08-27'
+method: probed
+source: live GET of /.well-known/* on every apis.yml + OpenAPI servers[] host
+note: >-
+  One real hit: an RFC 9116 security.txt on mystars.tg, saved verbatim. Every other path 404s.
+  The api.mystars.tg host serves a bare nginx 404 for all of them; mystars.tg serves a Next.js
+  404 page. No OAuth/OIDC metadata (the API is API-key authenticated, not OAuth), no
+  api-catalog, no ai-plugin.json, and no A2A agent card on either host.
+hosts:
+- host: mystars.tg
+  documents:
+  - path: /.well-known/security.txt
+    status: 200
+    file: mystars-security.txt
+    content_type: text/plain
+  - path: /.well-known/openid-configuration
+    status: 404
+  - path: /.well-known/oauth-authorization-server
+    status: 404
+  - path: /.well-known/oauth-protected-resource
+    status: 404
+  - path: /.well-known/api-catalog
+    status: 404
+  - path: /.well-known/ai-plugin.json
+    status: 404
+  - path: /.well-known/agent-card.json
+    status: 404
+  - path: /.well-known/agent.json
+    status: 404
+- host: api.mystars.tg
+  documents:
+  - path: /.well-known/security.txt
+    status: 404
+  - path: /.well-known/openid-configuration
+    status: 404
+  - path: /.well-known/oauth-authorization-server
+    status: 404
+  - path: /.well-known/oauth-protected-resource
+    status: 404
+  - path: /.well-known/api-catalog
+    status: 404
+  - path: /.well-known/ai-plugin.json
+    status: 404
+  - path: /.well-known/agent-card.json
+    status: 404
+  - path: /.well-known/agent.json
+    status: 404

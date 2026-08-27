@@ -1,0 +1,48 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/developers
+docs: https://mystars.tg/developers
+note: >-
+  MyStars publishes NO tiered plans for the API — there is no plan table, no free/pro/enterprise
+  ladder, and https://mystars.tg/pricing returns 404. What it publishes instead is a single,
+  fully-disclosed usage-based model: a flat 5% margin already included in every quote, no setup
+  fee and no monthly minimum, with the all-in amount returned by GET /v1/pricing before the
+  integrator charges anyone. plan_count is therefore an honest 0 — the absence of tiers is the
+  finding, not a gap in the harvest.
+plan_count: 0
+plans: []
+pricing_model:
+  type: usage-based
+  tiers: none
+  margin: 5%
+  margin_included_in_quote: true
+  setup_fee: none
+  monthly_minimum: none
+  currencies: [GRAM (ex TON), USDT (TON)]
+  settlement: on-chain, non-custodial — the integrator pays each order individually to the
+    returned treasury address; there is no prepaid balance and no invoice.
+  quote_endpoint:
+    operationId: getPricing
+    path: GET /v1/pricing
+    note: >-
+      Returns the all-in amount plus quoted_at / valid_until (a re-quote hint — the price tracks
+      the market and is recomputed about every minute, and is locked only when an order is
+      created) and usdt_per_ton, the public GRAM<->USDT rate.
+  batch_quote_endpoint:
+    operationId: getPricingBatch
+    path: GET /v1/pricing/batch
+    note: Quotes up to 200 Stars quantities in one request, for storefronts refreshing a catalog.
+  pass_through_fees:
+  - name: USDT swap processing fee
+    amount: 1% DEX swap fee + 0.5 GRAM swap gas
+    applies_to: payment_currency = usdt_ton
+    note: >-
+      Itemised in the PaymentInstruction.fee object. It is ALREADY included in amount and does
+      not add to it; fee is null for native GRAM (ton) payments, which involve no swap.
+  free_tier: none documented
+  signup: https://t.me/my_stars_tg_bot (API key issued in the Telegram bot, no dashboard, no KYC)
+consumer_pricing:
+  note: >-
+    Separate from the API. Per-pack Stars prices and the 3/6/12-month Premium prices are
+    published on https://mystars.tg/ and https://mystars.tg/premium beside the equivalent in-app
+    price. Not an API plan; recorded here so the zero above is not read as "no prices anywhere".

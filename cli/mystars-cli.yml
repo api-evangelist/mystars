@@ -1,0 +1,48 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/docs/sdks
+docs: https://mystars.tg/docs/sdks
+name: mystars-faas
+package: '@mystars-tg/faas-cli'
+registry: npm
+version: 0.1.9
+published: '2026-08-04'
+license: MIT
+install:
+- method: npm
+  command: npm install -g @mystars-tg/faas-cli
+- method: npx
+  command: npx @mystars-tg/faas-cli
+authentication:
+  scheme: X-Api-Key
+  note: >-
+    The CLI carries the same tenant API key as the SDKs, issued in @my_stars_tg_bot under
+    "API access". Offline webhook verification is the one capability that needs the separate
+    webhook signing secret rather than the API key.
+command_surface:
+- group: pricing
+  description: Quote prices for Stars and Premium in GRAM or USDT.
+  backing_operations: [getPricing, getPricingBatch, listCurrencies, listProducts]
+- group: recipient checks
+  description: Resolve an @username and check delivery eligibility before ordering.
+  backing_operations: [checkRecipient]
+- group: order management
+  description: Create, inspect, list and cancel fulfilment orders.
+  backing_operations: [createOrder, listOrders, getOrder, cancelOrder]
+- group: payment links
+  description: Build a ton:// deeplink / payment request from an order's payment block.
+  backing_operations: []
+  note: Client-side helper over PaymentInstruction; no REST operation of its own.
+- group: watching
+  description: Follow an order until it reaches a terminal status.
+  backing_operations: [getOrder]
+- group: webhook verification
+  description: >-
+    Verify an X-Faas-Signature HMAC-SHA256 offline against a captured raw body — including the
+    comma-separated multi-signature form used during a 24-hour secret rollover.
+  backing_operations: [orderStatusWebhook]
+note: >-
+  Command groups are recorded as the SDKs page names them ("pricing, orders, watching, and
+  offline webhook verification", plus recipient checks and payment links). Exact flag syntax is
+  not published on the site and was not invented here; the backing_operations mapping is derived
+  from openapi/mystars-faas-openapi.json.

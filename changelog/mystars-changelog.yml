@@ -1,0 +1,157 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/docs
+docs: https://mystars.tg/docs
+note: >-
+  MyStars publishes a dated, versioned changelog inline on the API reference page — "Every
+  change to the public API, newest first" — with each entry typed feature / fix / breaking. All
+  17 published entries are captured; the log is complete back to v1.0.0 (2026-06-01), which is
+  the first public version.
+scheme: semver
+current_version: 1.12.0
+current_version_date: '2026-08-04'
+first_version: 1.0.0
+first_version_date: '2026-06-01'
+entry_count: 17
+breaking_count: 2
+entries:
+- version: 1.12.0
+  date: '2026-08-04'
+  kind: feature
+  title: Payment window extended to 2 hours
+  breaking: false
+  highlights: >-
+    An order now stays open for payment for 2 hours instead of 1. No request or response shape
+    changed — expires_at remains the single source of truth for the deadline, and the spec
+    deliberately no longer quotes a duration anywhere so it cannot go stale. Note the SDK
+    settle-wait helpers still default to a 30-minute budget, now a quarter of the window.
+- version: 1.11.0
+  date: '2026-07-28'
+  kind: feature
+  title: Recipient checks now tell you when they could not decide
+  breaking: false
+  highlights: >-
+    POST /v1/recipients/check always returns an indeterminate boolean — true when the probe could
+    not reach a verdict and failed open, so eligible:true is a permissive default rather than a
+    measurement. Previously a degraded probe was indistinguishable on the wire from a confirmed
+    deliverable recipient. Strictly additive; absent means false.
+- version: 1.10.0
+  date: '2026-07-10'
+  kind: feature
+  title: Batch pricing + a dedicated order-lifecycle rate-limit bucket
+  breaking: false
+  highlights: >-
+    New GET /v1/pricing/batch quotes up to 200 Stars quantities in one request (deduped, sorted,
+    cent-for-cent identical to GET /v1/pricing). createOrder, getOrder and cancelOrder moved to
+    their own per-minute bucket isolated from read traffic. Both strictly additive.
+- version: 1.9.0
+  date: '2026-06-28'
+  kind: feature
+  title: Payment window extended to 1 hour
+  breaking: false
+  highlights: Order payment window raised from 15 minutes to 1 hour; expires_at unchanged in shape.
+- version: 1.8.2
+  date: '2026-06-24'
+  kind: feature
+  title: Order create response echoes what was ordered
+  breaking: false
+  highlights: >-
+    POST /v1/orders now returns type plus quantity (Stars) or months (Premium); the inapplicable
+    field is null. The created order is self-describing — no correlation back to the request.
+- version: 1.8.1
+  date: '2026-06-23'
+  kind: fix
+  title: 'Clearer docs: request-flow diagram + recipient-check guidance'
+  breaking: false
+  highlights: >-
+    The reference now leads with the recommended call order (pricing -> recipient check -> order
+    create) and a request-flow diagram. Documents that a recipient with an active Premium
+    subscription cannot be gifted Premium (eligible:false, reason already_subscribed; the order
+    would 422). Docs only — no contract change.
+- version: 1.8.0
+  date: '2026-06-23'
+  kind: feature
+  title: USDT payments show a processing-fee breakdown
+  breaking: false
+  highlights: >-
+    For usdt_ton, pricing and order-create payment blocks include a fee object — subtotal,
+    processing_fee (1% swap + 0.5 GRAM gas), total and a description. The fee was always included
+    in amount; this only itemises it. GRAM quotes return fee:null.
+- version: 1.7.1
+  date: '2026-06-23'
+  kind: feature
+  title: Pricing response echoes what it priced
+  breaking: false
+  highlights: GET /v1/pricing returns type plus quantity or months so the amount is self-describing.
+- version: 1.7.0
+  date: '2026-06-23'
+  kind: feature
+  title: 'New: list available products'
+  breaking: false
+  highlights: >-
+    GET /v1/products returns the price-free product catalog — the two types (stars, premium) and
+    the buyable shape of each (stars 50-1000000; premium 3/6/12 months).
+- version: 1.6.1
+  date: '2026-06-23'
+  kind: fix
+  title: Reversal terminology standardised
+  breaking: false
+  highlights: >-
+    Docs standardised on "reversal" to match the reversed status and reversal_tx, and added a
+    "When a reversal happens" breakdown. No behaviour change.
+- version: 1.6.0
+  date: '2026-06-22'
+  kind: feature
+  title: Unmatched payments are auto-refunded
+  breaking: false
+  highlights: >-
+    A payment arriving with no order reference (missing or unrecognised memo) is returned to the
+    sender minus the network fee. If attributable to one pending order, that order ends failed
+    with failure_reason no_memo / wrong_memo and the refund reference in reversal_tx.
+- version: 1.5.0
+  date: '2026-06-21'
+  kind: feature
+  title: Rate limits documented; probe cap raised to 30/min
+  breaking: false
+  highlights: >-
+    The overview documented the per-minute budget, the RateLimit-* / Retry-After headers, the
+    daily order cap and the per-recipient guard. Probe cap raised from 10 to 30 req/min (the
+    current overview states 60, raised again without a changelog entry naming the number).
+- version: 1.4.0
+  date: '2026-06-21'
+  kind: feature
+  title: Pricing response adds quote freshness + GRAM/USDT rate
+  breaking: false
+  highlights: GET /v1/pricing returns quoted_at, valid_until and usdt_per_ton.
+- version: 1.3.0
+  date: '2026-06-21'
+  kind: feature
+  title: Terminal failed and expired order-status webhooks now fire
+  breaking: false
+  highlights: >-
+    With a callback_url set, failed and expired terminal events are now delivered too;
+    previously only delivered and reversed fired.
+- version: 1.2.0
+  date: '2026-06-21'
+  kind: breaking
+  title: Pricing response returns amount + currency only
+  breaking: true
+  highlights: >-
+    The previous breakdown object was removed from GET /v1/pricing — amount is already the
+    all-in total. Only affects callers reading breakdown fields.
+- version: 1.1.0
+  date: '2026-06-17'
+  kind: feature
+  title: Pay in USDT (TON), plus a price breakdown
+  breaking: false
+  highlights: >-
+    Orders and quotes accept payment_currency usdt_ton alongside ton (GRAM); pricing gained a
+    breakdown object (Fragment cost, markup, gas, DEX fee + swap gas for USDT).
+- version: 1.0.0
+  date: '2026-06-01'
+  kind: breaking
+  title: recipient is now an object, not a bare string
+  breaking: true
+  highlights: >-
+    Create-order and recipient-check requests take recipient:{username} instead of a top-level
+    username string. The old shape is rejected with 400 bad_request.

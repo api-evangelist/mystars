@@ -1,0 +1,115 @@
+overlay: 1.0.0
+info:
+  title: API Evangelist enhancements — MyStars FaaS Fulfilment API
+  version: 1.0.0
+x-provenance:
+  generated: '2026-08-27'
+  method: generated
+  source: openapi/mystars-faas-openapi.json + https://mystars.tg/docs
+  extends: openapi/mystars-faas-openapi.json
+  note: >-
+    Non-destructive enhancements only. The original spec is never mutated. Every value below is
+    either derived from the published contract or quoted from the API overview rendered at
+    https://mystars.tg/docs — which carries a substantially richer info.description than the
+    machine-served /openapi.json does. That gap is the main thing this overlay closes: an agent
+    reading only /openapi.json never sees the rate-limit ceilings, the idempotency retry rule,
+    or the reversal tolerances, because they live only in the docs-page rendering.
+actions:
+- target: $.info
+  description: Point consumers at the derived artifact set and record the documented runtime semantics missing from the machine-served spec.
+  update:
+    x-apievangelist-artifacts:
+      conventions: conventions/mystars-conventions.yml
+      errors: errors/mystars-problem-types.yml
+      settlement_outcomes: errors/mystars-decline-codes.yml
+      rate_limits: rate-limits/mystars-rate-limits.yml
+      lifecycle: lifecycle/mystars-lifecycle.yml
+      data_model: data-model/mystars-data-model.yml
+      webhooks: asyncapi/mystars-webhooks.yml
+      authentication: authentication/mystars-authentication.yml
+      packages: packages/mystars-packages.yml
+      changelog: changelog/mystars-changelog.yml
+    x-rate-limits:
+      general: 60 requests/minute per tenant across /v1 reads
+      order_lifecycle: 60 requests/minute in a separate bucket for createOrder, getOrder, cancelOrder
+      upstream_probe: 60 requests/minute additional cap on getPricing, getPricingBatch, checkRecipient
+      headers: [RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After]
+      unheadered_429s: daily order cap and per-recipient concurrency guard return the envelope only
+    x-money-representation: >-
+      All monetary amounts are decimal strings in the unit named by the adjacent *_units /
+      currency field. Treat as exact strings; do not parse to float.
+- target: $.info
+  description: Record that the machine-served spec omits the operational overview published on the docs page.
+  update:
+    x-docs-parity:
+      machine_served_description_chars: 1068
+      docs_rendered_description_chars: ~13000
+      missing_from_machine_spec: [Quick start, Authentication, Rate limits, Webhooks, Amounts, Idempotency, Errors, 'Reversals & delivery', When a reversal happens]
+      recommendation: >-
+        Publish the same info.description at /openapi.json and /openapi.yaml that the reference
+        page renders, so an agent fetching the contract directly gets the operating rules too.
+- target: $.paths['/v1/orders'].post
+  description: Annotate the one high-consequence write operation with its reversal path and window.
+  update:
+    x-consequence: high
+    x-idempotent: true
+    x-idempotency-header: Idempotency-Key
+    x-idempotency-rule: >-
+      Same key + identical body replays the original order (200 instead of 201); same key +
+      different body is 409. Use a STABLE key equal to your own order id — a new key creates a
+      brand-new order and a second charge.
+    x-retry-safe-on: [503]
+    x-reversibility:
+      grade: verified
+      reversal_operation: cancelOrder
+      window: >-
+        While status is awaiting_payment, bounded by the order's expires_at (2 hours since
+        v1.12.0). Any other state returns 409.
+      post_payment: >-
+        No caller-invoked undo, but funds are automatically reversed on-chain minus the network
+        fee on payment mismatch (outside -1% .. +2%), undeliverable, or unmatched payment.
+- target: $.paths['/v1/orders/{id}/cancel'].post
+  description: Record the state precondition as a machine-readable annotation.
+  update:
+    x-consequence: medium
+    x-precondition-status: awaiting_payment
+    x-reversibility:
+      grade: na
+      note: Terminal, but an unpaid cancelled order has nothing to reverse.
+- target: $.paths['/v1/recipients/check'].post
+  description: Flag the fail-open behaviour, which is easy to misread as a guarantee.
+  update:
+    x-consequence: none
+    x-read-only: true
+    x-fail-open: true
+    x-caution: >-
+      eligible:true with indeterminate:true means the probe could not decide, not that the
+      recipient is deliverable. Never present it to a buyer as confirmed.
+- target: $.paths['/v1/pricing'].get
+  description: Record quote volatility, which the response fields imply but do not state.
+  update:
+    x-consequence: none
+    x-read-only: true
+    x-quote-volatility: >-
+      The price tracks the market and is recomputed about every minute. quoted_at / valid_until
+      are a re-quote hint; the price is locked only when an order is created.
+- target: $.webhooks.orderStatus.post
+  description: Make the rollover multi-signature rule explicit at the operation level.
+  update:
+    x-signature-header: X-Faas-Signature
+    x-signature-algorithm: HMAC-SHA256 (hex) over the exact raw body
+    x-signature-multi-value: >-
+      During a 24-hour secret rollover the header carries comma-separated signatures. Parse as a
+      list and accept if ANY entry matches — single-value verification silently breaks on the
+      first rotation.
+    x-receiver-timeout: 5 seconds
+    x-follows-redirects: false
+- target: $.components.schemas.OrderStatus
+  description: Separate terminal from non-terminal states so an agent knows when to stop polling.
+  update:
+    x-terminal-values: [delivered, failed, reversed, expired, cancelled]
+    x-non-terminal-values: [received, awaiting_payment, paid, reserved, swapping, funding, purchasing, fulfilling, completed, held]
+    x-cancellable-values: [awaiting_payment]
+    x-held-warning: >-
+      held is NOT terminal — it means processing or manual review and resolves to delivered or
+      reversed. Do not re-create the order.

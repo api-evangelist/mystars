@@ -1,0 +1,77 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/docs
+docs: https://mystars.tg/docs
+note: >-
+  MyStars documents three independent limiters plus two unpublished-ceiling guards, and — the
+  part that matters to an agent — tells you to read the live ceiling off the response headers
+  rather than hard-code it. Read from the "Rate limits" section of the API overview rendered at
+  https://mystars.tg/docs; the RateLimited 429 response in the published OpenAPI
+  (components/responses/RateLimited) states the same headers. Not observed live: every /v1 route
+  requires an X-Api-Key, so the headers could not be confirmed on an unauthenticated call.
+limit_count: 3
+limits:
+- name: General per-minute request budget
+  scope: per-tenant (API key)
+  window: 1 minute
+  limit: 60
+  unit: requests
+  applies_to: the /v1 read endpoints
+  headers: [RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After]
+  status_on_exhaustion: 429
+  note: Default is 60 req/min; the docs say to read the live value from RateLimit-Limit rather than assume it.
+- name: Order-lifecycle bucket
+  scope: per-tenant (API key)
+  window: 1 minute
+  limit: 60
+  unit: requests
+  applies_to: [createOrder, getOrder, cancelOrder]
+  headers: [RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After]
+  status_on_exhaustion: 429
+  note: >-
+    A separate bucket of the same per-minute size as the general budget, isolated from read
+    traffic — a burst of pricing or catalog reads can never throttle an order create, status
+    poll or cancel, and vice versa. On these routes the RateLimit-* headers report this bucket.
+    Added in v1.10.0 (2026-07-10).
+- name: Upstream probe cap
+  scope: per-tenant (API key)
+  window: 1 minute
+  limit: 60
+  unit: requests
+  applies_to: [getPricing, getPricingBatch, checkRecipient]
+  headers: [RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After]
+  status_on_exhaustion: 429
+  note: >-
+    A tighter cap that applies IN ADDITION to the general budget, because each call drives a live
+    upstream price/eligibility lookup. On these routes the headers report this (binding) budget.
+    getPricingBatch counts as ONE unit however many quantities it quotes (up to 200).
+guards:
+- name: Daily order cap
+  scope: per-tenant (API key)
+  window: 1 day
+  limit: null
+  applies_to: [createOrder]
+  status_on_exhaustion: 429
+  note: >-
+    Described as optional and per-tenant; no number is published, and this 429 carries the error
+    envelope only — no RateLimit-* or Retry-After headers.
+- name: Per-recipient concurrency guard
+  scope: per recipient @username
+  limit: null
+  applies_to: [createOrder]
+  status_on_exhaustion: 429
+  note: >-
+    A short-term guard on concurrent orders to the same recipient; the docs advise spacing out
+    bursts to a single @username. No number published; envelope-only 429.
+response_headers:
+  RateLimit-Limit: Your current per-minute budget for the binding bucket on this route.
+  RateLimit-Remaining: Requests left in the active window.
+  RateLimit-Reset: Seconds until the window resets.
+  Retry-After: On a 429, how long to wait before retrying.
+error_envelope: '{ "error": { "code": "rate_limited", "message": "rate limit exceeded" } }'
+status_code: 429
+history:
+  note: >-
+    The v1.5.0 changelog entry (2026-06-21) records the probe cap being raised from 10 to 30
+    req/min; the current overview states 60 req/min, so it was raised again without a changelog
+    entry naming the number.

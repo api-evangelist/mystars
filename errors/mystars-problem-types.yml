@@ -1,0 +1,95 @@
+generated: '2026-08-27'
+method: derived
+source: openapi/mystars-faas-openapi.json + https://mystars.tg/docs
+docs: https://mystars.tg/docs
+format: custom
+rfc9457: false
+note: >-
+  MyStars does NOT use RFC 9457 application/problem+json. It publishes a single stable envelope,
+  application/json, with a machine-branchable code enum — documented in the overview's "Errors"
+  section and modelled as components/schemas/Error in the published spec. Titles and remediation
+  below are derived from the OpenAPI response descriptions and the overview; none are invented.
+envelope:
+  content_type: application/json
+  shape: '{ "error": { "code", "message", "telegram_message?" } }'
+  fields:
+    code: Stable machine error code to branch on (enum, below).
+    message: Human-readable description.
+    telegram_message: A verbatim user-facing message from Fragment, when present.
+  guarantee: Never an HTML page — including malformed-body and oversize-body rejections.
+problem_type_count: 9
+problem_types:
+- code: bad_request
+  http_status: 400
+  title: Malformed request
+  remediation: >-
+    Fix the request body or query parameters. Also returned as 413 for a body larger than 256 KB,
+    and for a callback_url that is not a publicly reachable https:// URL (loopback addresses,
+    private-network hosts and non-HTTPS schemes are rejected).
+  operations: [createOrder, listOrders, checkRecipient, getPricing, getPricingBatch]
+- code: unauthorized
+  http_status: 401
+  title: Missing or invalid X-Api-Key
+  remediation: Send a valid tenant key in the X-Api-Key header; rotate with /api_rotate in @my_stars_tg_bot.
+  operations: [createOrder, listOrders, getOrder, cancelOrder, checkRecipient, getPricing, getPricingBatch, listCurrencies, listProducts]
+- code: forbidden
+  http_status: 403
+  title: Forbidden
+  remediation: >-
+    Declared in the Error code enum. No operation in the published spec documents a 403 response,
+    so the condition that raises it is not stated in the contract.
+  operations: []
+- code: not_found
+  http_status: 404
+  title: No such order for this tenant
+  remediation: >-
+    Check the order id. Orders are tenant-isolated — another tenant's id, or an unknown or
+    malformed id, returns 404 rather than leaking its existence.
+  operations: [getOrder, cancelOrder]
+- code: conflict
+  http_status: 409
+  title: Idempotency or state conflict
+  remediation: >-
+    On createOrder, the Idempotency-Key was reused with a DIFFERENT body — either reuse the
+    original body (which replays the original order, 200) or use a new key. On cancelOrder, the
+    order is not in awaiting_payment and cannot be cancelled.
+  operations: [createOrder, cancelOrder]
+- code: recipient_ineligible
+  http_status: 422
+  title: The recipient cannot receive this item
+  remediation: >-
+    No order is created and you are not charged. Pre-flight with POST /v1/recipients/check, which
+    returns eligible:false plus a reason (e.g. already_subscribed — Telegram blocks gifting
+    Premium to anyone with an active subscription) and Telegram's verbatim wording in
+    telegram_message.
+  operations: [createOrder]
+- code: rate_limited
+  http_status: 429
+  title: A rate limit was reached
+  remediation: >-
+    Back off. Per-minute-budget 429s carry RateLimit-* and Retry-After headers; the daily order
+    cap and the per-recipient flood guard return the envelope only, with no headers.
+  operations: [createOrder, listOrders, getOrder, cancelOrder, checkRecipient, getPricing, getPricingBatch, listCurrencies, listProducts]
+  see: rate-limits/mystars-rate-limits.yml
+- code: unavailable
+  http_status: 503
+  title: A required source was temporarily unavailable
+  remediation: >-
+    RETRYABLE. The price source, or recipient eligibility verification, was momentarily
+    unavailable. No order is created and you are not charged — retry shortly with the SAME
+    Idempotency-Key.
+  operations: [createOrder, getPricing, getPricingBatch]
+- code: internal
+  http_status: 500
+  title: Internal error
+  remediation: >-
+    Declared in the Error code enum. No operation in the published spec documents a 500 response.
+    Contact https://t.me/Mystars_support_bot with the order_id if it persists.
+  operations: []
+observations:
+- >-
+  Two codes in the enum — forbidden and internal — appear on no operation in the published spec.
+  An agent should still handle them; the contract does not say when they fire.
+- >-
+  createOrder is the only operation with a 422, and it is the ONE error an integrator should
+  design around: it means no order and no charge, and it is preventable with a recipient check.

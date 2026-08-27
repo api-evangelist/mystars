@@ -1,0 +1,75 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/docs/sdks + registry.npmjs.org + pypi.org
+note: >-
+  Four first-party packages, all cut at 0.1.9 on 2026-08-04 — the same day the API shipped
+  v1.12.0 — so the SDK line is current with the contract it wraps. Versions and dates read
+  from registry.npmjs.org and pypi.org/pypi/<pkg>/json on 2026-08-27.
+official_count: 4
+packages:
+- name: '@mystars-tg/faas-sdk'
+  registry: npm
+  url: https://www.npmjs.com/package/@mystars-tg/faas-sdk
+  official: true
+  language: TypeScript/JavaScript
+  version: 0.1.9
+  published: '2026-08-04'
+  license: MIT
+  install: npm install @mystars-tg/faas-sdk
+  repository: https://github.com/mystars-tg/faas-ts
+  description: >-
+    Core client — HTTP with retries + idempotency, typed errors, pagination, order tracking,
+    webhook verification and non-custodial payment builders. Zero crypto dependencies; runs on
+    Node, Deno, Bun, Cloudflare Workers, edge runtimes and the browser.
+  note: >-
+    The declared repository https://github.com/mystars-tg/faas-ts returns 404 to the GitHub API —
+    the TypeScript source is not public, unlike the Python SDK (MyStars-tg/faas-python).
+- name: '@mystars-tg/faas-wallet'
+  registry: npm
+  url: https://www.npmjs.com/package/@mystars-tg/faas-wallet
+  official: true
+  language: TypeScript/JavaScript
+  version: 0.1.9
+  published: '2026-08-04'
+  license: MIT
+  install: npm install @mystars-tg/faas-wallet
+  repository: https://github.com/mystars-tg/faas-ts
+  description: >-
+    Opt-in self-custody TON wallet + payer (Node only). Signs and broadcasts a GRAM or USDT
+    payment for a FaaS order from a wallet the caller controls; keys are held in memory only and
+    are never persisted, logged, or transmitted.
+- name: '@mystars-tg/faas-cli'
+  registry: npm
+  url: https://www.npmjs.com/package/@mystars-tg/faas-cli
+  official: true
+  language: TypeScript/JavaScript
+  version: 0.1.9
+  published: '2026-08-04'
+  license: MIT
+  install: npm install -g @mystars-tg/faas-cli
+  binary: mystars-faas
+  repository: https://github.com/mystars-tg/faas-ts
+  description: >-
+    Command-line tool for pricing, recipient checks, order management, payment links and
+    offline webhook verification. Detailed in cli/mystars-cli.yml.
+- name: mystars-faas
+  registry: pypi
+  url: https://pypi.org/project/mystars-faas/
+  official: true
+  language: Python
+  version: 0.1.9
+  published: '2026-08-04'
+  install: pip install mystars-faas
+  requires_python: '>=3.9'
+  repository: https://github.com/MyStars-tg/faas-python
+  description: >-
+    Official Python SDK — sync and async clients, exact-Decimal money handling, typed errors,
+    automatic retries + idempotency, webhook verification and dependency-free on-chain payment
+    builders. httpx is the only runtime dependency.
+roadmap:
+- languages: [PHP, Go]
+  status: announced
+  source: https://mystars.tg/docs/sdks
+  note: >-
+    "Coming soon — PHP and Go SDKs are on the roadmap." No dated commitment and no roadmap page
+    (https://mystars.tg/roadmap returns 404).

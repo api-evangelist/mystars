@@ -1,0 +1,83 @@
+generated: '2026-08-27'
+method: derived
+source: openapi/mystars-faas-openapi.json
+status: candidate
+note: >-
+  MyStars publishes NO MCP server. Searched the developer portal, the SDKs page, the API
+  reference, llms.txt, the GitHub account (MyStars-tg) and the npm scope @mystars-tg — MCP is
+  mentioned nowhere. Probed https://api.mystars.tg/mcp (404 nginx), https://mystars.tg/api/mcp
+  (404 {"error":"Not Found"}), and https://mystars.tg/mcp/ (301 -> 403 nginx, a deny rule rather
+  than a JSON-RPC endpoint; a tools/list POST returned the same 403 HTML). mcp.mystars.tg does
+  not resolve. The tools[] below are a DERIVED candidate mapping of the nine published REST
+  operations, offered as a design for a server that does not exist — never as evidence that one
+  does. No endpoint URL has been invented.
+deployment:
+  mode: none
+  endpoint: null
+  install: null
+  package: null
+  auth: api-key
+  verified: probed
+probes:
+- url: https://api.mystars.tg/mcp
+  method: POST tools/list
+  status: 404
+- url: https://mystars.tg/api/mcp
+  method: POST tools/list
+  status: 404
+- url: https://mystars.tg/mcp/
+  method: POST tools/list
+  status: 403
+  note: nginx 403 deny, not an MCP transport; GET returns the same.
+- url: https://mcp.mystars.tg/mcp
+  method: POST tools/list
+  status: <no response>
+  note: hostname does not resolve
+candidate_tools:
+- name: get_pricing
+  description: Quote the all-in price for Stars or Premium in GRAM or USDT.
+  rest: getPricing
+  read_only: true
+- name: get_pricing_batch
+  description: Quote up to 200 Stars quantities in one call.
+  rest: getPricingBatch
+  read_only: true
+- name: list_currencies
+  description: List supported payment currencies.
+  rest: listCurrencies
+  read_only: true
+- name: list_products
+  description: List orderable product types and their buyable limits.
+  rest: listProducts
+  read_only: true
+- name: check_recipient
+  description: Check whether an @username can receive Stars or a Premium gift before ordering.
+  rest: checkRecipient
+  read_only: true
+  caution: Fails open — indeterminate:true means unknown, not eligible.
+- name: create_order
+  description: Create a fulfilment order and return the on-chain payment instruction.
+  rest: createOrder
+  read_only: false
+  consequence: high — creates a payable order; requires a stable Idempotency-Key.
+  reversible: true (cancel while awaiting_payment, within expires_at)
+- name: get_order
+  description: Fetch one order by id.
+  rest: getOrder
+  read_only: true
+- name: list_orders
+  description: List tenant orders, newest first, keyset-paginated.
+  rest: listOrders
+  read_only: true
+- name: cancel_order
+  description: Cancel an order that is still awaiting_payment.
+  rest: cancelOrder
+  read_only: false
+  consequence: medium — terminal, but an unpaid cancelled order has nothing to reverse.
+authentication_if_built:
+  scheme: api-key
+  header: X-Api-Key
+  note: >-
+    A server would carry one tenant key. The key alone cannot move funds — every order is settled
+    by its own on-chain payment — but it CAN create orders, read order history and cancel unpaid
+    orders, so it is a write credential.

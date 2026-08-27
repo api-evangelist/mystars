@@ -1,7 +1,15 @@
 aid: mystars
 name: MyStars FaaS
-description: Public B2B fulfilment API for buying and reselling Telegram Stars and Telegram Premium, paid in GRAM or USDT
-  on the TON network.
+description: >-
+  MyStars FaaS is a public B2B fulfilment API for buying and reselling Telegram Stars and Telegram
+  Premium, delivered to any Telegram @username and settled on-chain in GRAM (ex TON) or USDT on
+  the TON network. Integrators quote an all-in price, check that a recipient can receive the item,
+  create an idempotent order, and pay the returned treasury address with the order id as the
+  transfer memo; MyStars fulfils the delivery through Fragment and confirms it with an
+  HMAC-signed webhook. The model is non-custodial and no-KYC — there is no prepaid balance and no
+  card processor, and a flat 5% margin is already included in every quote. Official TypeScript and
+  Python SDKs, plus a CLI, ship on npm and PyPI.
+image: https://mystars.tg/icon.png
 url: https://mystars.tg/apis.json
 created: '2026-07-12'
 modified: '2026-08-27'
@@ -9,6 +17,7 @@ specificationVersion: '0.18'
 maintainers:
 - FN: MyStars.tg
   url: https://t.me/Mystars_support_bot
+  email: admin@mystars.tg
 tags:
 - telegram
 - telegram-stars
@@ -17,6 +26,9 @@ tags:
 - crypto
 - ton
 - fulfilment
+- blockchain
+- digital-goods
+- reseller-api
 apis:
 - aid: mystars.tg:faas:v1
   name: MyStars FaaS — Fulfilment API
@@ -32,7 +44,85 @@ apis:
     url: https://mystars.tg/docs
   - type: OpenAPI
     url: https://mystars.tg/openapi.json
-  - type: Signup
+  - type: OpenAPI
+    url: openapi/mystars-faas-openapi.json
+  - type: SignUp
     url: https://t.me/my_stars_tg_bot
   - type: LLMsTxt
     url: https://mystars.tg/llms.txt
+common:
+- type: VulnerabilityDisclosure
+  url: security/mystars-vulnerability-disclosure.yml
+- type: DomainSecurity
+  url: security/mystars-domain-security.yml
+- type: Authentication
+  url: authentication/mystars-authentication.yml
+- type: Security
+  url: security/mystars-vulnerability-disclosure.yml
+- type: DeveloperPortal
+  url: https://mystars.tg/developers
+- type: Documentation
+  url: https://mystars.tg/docs
+- type: APIReference
+  url: https://mystars.tg/docs
+- type: GettingStarted
+  url: https://mystars.tg/developers
+- type: Support
+  url: https://t.me/Mystars_support_bot
+- type: Blog
+  url: https://mystars.tg/blog
+- type: GitHubOrganization
+  url: https://github.com/MyStars-tg
+- type: Pricing
+  url: https://mystars.tg/developers
+- type: SignUp
+  url: https://t.me/my_stars_tg_bot
+- type: TermsOfService
+  url: https://mystars.tg/terms
+- type: PrivacyPolicy
+  url: https://mystars.tg/privacy
+- type: Packages
+  url: packages/mystars-packages.yml
+- type: SDKs
+  url: packages/mystars-packages.yml
+- type: CLI
+  url: cli/mystars-cli.yml
+- type: WellKnown
+  url: well-known/mystars-well-known.yml
+- type: SecurityTxt
+  url: well-known/mystars-security.txt
+- type: LLMsTxt
+  url: llms/mystars-llms.txt
+- type: Overlay
+  url: overlays/mystars-faas-overlay.yaml
+- type: Conformance
+  url: conformance/mystars-conformance.yml
+- type: ErrorCatalog
+  url: errors/mystars-problem-types.yml
+- type: DeclineCodes
+  url: errors/mystars-decline-codes.yml
+- type: Lifecycle
+  url: lifecycle/mystars-lifecycle.yml
+- type: Conventions
+  url: conventions/mystars-conventions.yml
+- type: Idempotency
+  url: conventions/mystars-conventions.yml
+- type: ChangeLog
+  url: changelog/mystars-changelog.yml
+- type: DataModel
+  url: data-model/mystars-data-model.yml
+- type: Webhooks
+  url: asyncapi/mystars-webhooks.yml
+- type: AgentSkill
+  url: skills/_index.yml
+- type: Examples
+  url: examples/mystars-examples.yml
+- type: Plans
+  url: plans/mystars-plans-pricing.yml
+- type: RateLimits
+  url: rate-limits/mystars-rate-limits.yml
+x-enrichment:
+  date: '2026-08-27'
+  status: enriched
+  artifacts_added: 26
+  pass: local-v1

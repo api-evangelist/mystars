@@ -1,0 +1,20 @@
+generated: '2026-08-27'
+method: derived
+source: openapi/mystars-faas-openapi.json
+summary:
+  types:
+  - apiKey
+  api_key_in:
+  - header
+schemes:
+- name: ApiKeyAuth
+  type: apiKey
+  in: header
+  parameter: X-Api-Key
+  description: 'Your secret API key. Get one from [@my_stars_tg_bot](https://t.me/my_stars_tg_bot)
+    → **API access**, then send it in the `X-Api-Key` header on every request. Treat it like
+    a password — anyone with the key can create orders on your tenant, read your order history,
+    and cancel unpaid orders. Each order is settled by its own on-chain payment, so the key
+    by itself cannot move funds. Rotate it any time '
+  sources:
+  - openapi/mystars-faas-openapi.json

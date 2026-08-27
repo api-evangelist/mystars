@@ -1,0 +1,123 @@
+generated: '2026-08-27'
+method: derived
+source: openapi/mystars-faas-openapi.json
+note: >-
+  Entity graph derived from components.schemas $ref links and id-reference fields in the
+  published OpenAPI 3.1.0. Small and deliberately flat: Order is the only persisted, addressable
+  resource — everything else is either a value object embedded in a response or a catalog lookup.
+identifiers:
+  order_id:
+    format: uuid
+    note: >-
+      The single most important identifier in the API. It is the resource id for GET/POST
+      /v1/orders/{id}, the required on-chain transfer memo (PaymentInstruction.memo equals it),
+      the correlator in the orderStatus webhook payload, and the value support asks for. No
+      id-prefix scheme (unlike Stripe-style ord_...); it is a bare UUID.
+  recipient_username:
+    format: Telegram @username
+    note: The delivery address. Not an internal id — MyStars holds no account record for the recipient.
+entities:
+- name: Order
+  persisted: true
+  addressable: true
+  operations: [createOrder, listOrders, getOrder, cancelOrder]
+  primary_key: order_id
+  tenancy: >-
+    Tenant-isolated by API key. Another tenant's order id returns 404 rather than 403, so
+    existence is not leaked.
+  key_fields: [order_id, status, type, recipient_username, quantity, months, amount_ton, payment_tx, purchase_tx, failure_reason, reversal_tx, telegram_message, created_at, updated_at, expires_at]
+  relationships:
+  - has_one: OrderStatus
+    via: status
+    kind: enum
+  - has_one: OrderType
+    via: type
+    kind: enum
+  - has_one: Recipient
+    via: recipient_username
+    kind: denormalised — the Order carries the username directly, not a Recipient reference
+- name: CreatedOrder
+  persisted: false
+  note: >-
+    The createOrder response projection — an Order plus the PaymentInstruction needed to settle
+    it. Not separately addressable; a later GET /v1/orders/{id} returns Order.
+  relationships:
+  - has_one: PaymentInstruction
+    via: payment
+- name: PaymentInstruction
+  persisted: false
+  kind: value object
+  key_fields: [currency, chain, pay_to_address, memo, amount, amount_units, fee]
+  relationships:
+  - has_one: PaymentCurrency
+    via: currency
+    kind: enum
+  - has_one: FeeBreakdown
+    via: fee
+    kind: nullable — populated only for usdt_ton; null for native GRAM
+- name: FeeBreakdown
+  persisted: false
+  kind: value object
+  note: >-
+    Itemises the USDT processing fee (1% DEX swap + 0.5 GRAM swap gas) ALREADY included in
+    PaymentInstruction.amount. fee.total equals amount; it never adds to it.
+- name: Recipient
+  persisted: false
+  kind: value object
+  key_fields: [username]
+  note: >-
+    A request-side object only ({ username }), since v1.0.0. There is no recipient resource, no
+    recipient id and no list-recipients operation — MyStars stores no profile for a delivery target.
+- name: RecipientCheckResult
+  persisted: false
+  operations: [checkRecipient]
+  key_fields: [eligible, reason, indeterminate, telegram_message]
+  note: >-
+    Read-only, fail-open. indeterminate:true (added v1.11.0) means the probe could not reach a
+    verdict, so eligible:true is a permissive default rather than a measurement.
+- name: Quote
+  persisted: false
+  operations: [getPricing]
+  key_fields: [amount, currency, type, quantity, months, quoted_at, valid_until, usdt_per_ton]
+  note: >-
+    Not a stored object and not a reservation. quoted_at / valid_until are a re-quote hint — the
+    price tracks the market and is recomputed about every minute; it is locked only when an order
+    is created.
+- name: QuoteBatch
+  persisted: false
+  operations: [getPricingBatch]
+  relationships:
+  - has_many: Quote
+    via: quantities (up to 200, deduped and sorted)
+- name: Product
+  persisted: false
+  operations: [listProducts]
+  note: >-
+    Price-free catalog metadata — the two order types and the buyable shape of each (stars: a
+    continuous 50..1000000 quantity range; premium: the fixed 3/6/12-month tiers).
+  relationships:
+  - has_one: OrderType
+    via: type
+- name: Error
+  persisted: false
+  kind: envelope
+  see: errors/mystars-problem-types.yml
+enumerations:
+- name: OrderStatus
+  values: [received, awaiting_payment, paid, reserved, swapping, funding, purchasing, fulfilling, completed, delivered, failed, reversed, expired, held, cancelled]
+  terminal: [delivered, failed, reversed, expired, cancelled]
+  cancellable: [awaiting_payment]
+  non_terminal_warning: >-
+    held is NOT terminal — it means processing or manual review, and resolves to delivered or
+    reversed. Treating it as final and re-creating the order is the documented mistake.
+- name: OrderType
+  values: [stars, premium]
+- name: PaymentCurrency
+  values: [ton, usdt_ton]
+  note: ton is native GRAM (ex TON); usdt_ton is USDT as a TEP-74 jetton on TON.
+graph_summary: >-
+  One aggregate root (Order) owning one value object (PaymentInstruction, which owns a nullable
+  FeeBreakdown), with Quote / Product / RecipientCheckResult as stateless lookups against it.
+  There is no customer, account, subscription, balance or ledger entity — a deliberate
+  consequence of the non-custodial, no-prepaid-balance design, and the reason the API has no
+  read surface for money the tenant has deposited: it never deposits any.

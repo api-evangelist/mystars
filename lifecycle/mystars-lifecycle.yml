@@ -1,0 +1,76 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/docs + openapi/mystars-faas-openapi.json
+docs: https://mystars.tg/docs
+versioning:
+  scheme: semver
+  current_version: 1.12.0
+  current_version_date: '2026-08-04'
+  path_version: /v1
+  location: [info.version in the published OpenAPI, the dated changelog on the reference page]
+  header_versioning: none
+  version_negotiation: none — one live major version
+changelog:
+  published: true
+  url: https://mystars.tg/docs
+  entry_count: 17
+  typed: true
+  types: [feature, fix, breaking]
+  see: changelog/mystars-changelog.yml
+deprecation_policy:
+  published: false
+  sunset_header: not documented
+  deprecation_header: not documented
+  rfc8594: false
+  note: >-
+    No deprecation policy page, no notice period, and no Sunset / Deprecation header documented.
+    No operation, parameter or schema in the published spec carries deprecated: true — nothing is
+    currently deprecated, but there is also no stated process for when something is. The nearest
+    published evidence of practice is the changelog: two breaking changes (v1.0.0, v1.2.0) were
+    announced in-log and typed "breaking", with the old shape rejected rather than dual-supported.
+    This is the clearest gap in an otherwise well-documented operational surface.
+breaking_change_history:
+- version: 1.0.0
+  date: '2026-06-01'
+  change: recipient became an object; the old bare-string username is rejected with 400 bad_request.
+- version: 1.2.0
+  date: '2026-06-21'
+  change: the pricing breakdown object was removed; amount was already the all-in total.
+frozen_fields:
+  note: >-
+    Two field names are explicitly frozen for wire compatibility across the TON->GRAM rebrand
+    rather than renamed — amount_ton (the GRAM fulfilment cost) and usdt_per_ton (the GRAM<->USDT
+    rate). Documented in the schema descriptions. A deliberate non-breaking choice worth recording.
+status_page:
+  published: false
+  probes:
+  - url: https://mystars.tg/status
+    status: 404
+  - url: https://status.mystars.tg
+    status: no DNS resolution
+  note: >-
+    No status page and no uptime history. The only availability signal in the contract is the
+    503 unavailable response, which distinguishes a transient upstream price/eligibility outage
+    from a client error and is explicitly documented as retryable with the same Idempotency-Key.
+sla:
+  published: false
+  note: >-
+    No SLA, uptime target or credit scheme published. Two runtime timing commitments ARE stated
+    and are contractual in effect: a webhook receiver must respond within 5 seconds (connect,
+    headers and body each), and a rotated webhook secret stays valid for a 24-hour rollover window.
+support:
+  channel: https://t.me/Mystars_support_bot
+  community: https://t.me/mystarstg_official
+  correlator: order_id — a UUID that is also the on-chain payment memo
+roadmap:
+  published: false
+  probes:
+  - url: https://mystars.tg/roadmap
+    status: 404
+  note: >-
+    The only forward-looking statement is on the SDKs page — "PHP and Go SDKs are on the
+    roadmap" — with no date and no roadmap page.
+operation_lifecycle:
+  deprecated_operations: []
+  note: >-
+    Derived from openapi/mystars-faas-openapi.json — no operation carries a deprecated flag.

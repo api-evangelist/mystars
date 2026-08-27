@@ -1,0 +1,22 @@
+generated: '2026-08-27'
+method: generated
+source: openapi/mystars-faas-openapi.json + https://mystars.tg/docs
+note: >-
+  MyStars publishes no skills/, AGENTS.md or llms-full.txt of its own — searched the site, the
+  docs, llms.txt and the GitHub account. These three are packaged by API Evangelist from the
+  published contract and the API overview. Every operationId referenced was verified against
+  openapi/mystars-faas-openapi.json; none is invented.
+skill_count: 3
+skills:
+- name: mystars-buy-telegram-stars
+  file: mystars-buy-telegram-stars.md
+  summary: The marquee flow — quote, check the recipient, create an idempotent order, settle on-chain, confirm.
+  operations: [listProducts, listCurrencies, getPricing, checkRecipient, createOrder, getOrder, cancelOrder]
+- name: mystars-gift-telegram-premium
+  file: mystars-gift-telegram-premium.md
+  summary: The Premium variant — months instead of quantity, and the already_subscribed rule that fails most Premium orders.
+  operations: [listProducts, getPricing, checkRecipient, createOrder, getOrder, cancelOrder]
+- name: mystars-track-order-and-reversals
+  file: mystars-track-order-and-reversals.md
+  summary: Webhook verification (including the comma-separated rollover form) and polling, plus every reversal case and what happened to the money.
+  operations: [getOrder, listOrders, orderStatusWebhook]

@@ -1,0 +1,174 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/docs + openapi/mystars-faas-openapi.json
+docs: https://mystars.tg/docs
+note: >-
+  Cross-cutting runtime semantics for the MyStars Fulfilment API. Every field below is either
+  quoted from the API overview rendered at https://mystars.tg/docs or read out of the published
+  OpenAPI 3.1.0; nothing is inferred from the domain.
+authentication:
+  style: api-key
+  header: X-Api-Key
+  scope: per-tenant
+  issuance: >-
+    Keys are issued inside the Telegram bot @my_stars_tg_bot under "API access" — there is no
+    dashboard and no signup form. Bot commands /api_start, /api_rotate, /api_revoke, /api_usage.
+  rotation: /api_rotate (API key only — it does NOT rotate the webhook secret)
+  second_credential:
+    name: webhook signing secret
+    issuance: shown once alongside the API key on /api_start
+    rotation: /api_rotate_webhook, with a 24-hour dual-signing rollover window
+  see: authentication/mystars-authentication.yml
+idempotency:
+  supported: true
+  required: true
+  header: Idempotency-Key
+  applies_to: [createOrder]
+  scope: per-tenant, per-key
+  semantics: >-
+    Retrying with the same key AND an identical body returns the ORIGINAL order with HTTP 200
+    (a fresh create is 201). The same key with a DIFFERENT body is rejected 409 conflict.
+  retention: not published
+  guidance: >-
+    The docs and both SDK quickstarts tell you to pass a STABLE key equal to your own order id,
+    not a fresh UUID per attempt: a new Idempotency-Key creates a brand-new order and a new
+    charge. The retryable 503 (price source or eligibility oracle unavailable) is explicitly
+    documented as safe to retry with the SAME key — no order is created and you are not charged.
+  sdk_support: >-
+    Both official SDKs generate and reuse an idempotency key across automatic retries; the
+    TypeScript client takes { idempotencyKey } and the Python client idempotency_key.
+pagination:
+  style: keyset (opaque cursor)
+  applies_to: [listOrders]
+  request_params:
+    cursor: Opaque cursor from a previous page's next_cursor.
+    limit: integer, minimum 1, maximum 100, default 50
+    status: optional OrderStatus filter
+  response_fields:
+    orders: array of Order
+    next_cursor: string or null — pass back as ?cursor=; null marks the last page
+  ordering: newest first
+  note: >-
+    Tenant-scoped. Only one collection endpoint exists, so there is no cross-resource pagination
+    convention to reconcile.
+field_expansion:
+  supported: false
+  note: No expand / fields / include parameter exists on any operation.
+metadata:
+  supported: false
+  note: >-
+    No free-form metadata bag. The nearest equivalent is Idempotency-Key, which the docs
+    encourage you to set to your own order id so your system of record and MyStars' agree.
+request_id_tracing:
+  supported: partial
+  note: >-
+    Responses carry an x-request-id header from the edge (observed on live probes of
+    mystars.tg), but it is not documented in the OpenAPI or the overview, so it should not be
+    relied on as a support correlator. The documented correlator is order_id — a UUID that is
+    ALSO the on-chain payment memo, which makes one identifier span the HTTP call, the support
+    conversation and the TON transaction.
+versioning:
+  scheme: semver on the contract (info.version 1.12.0) + a major version in the path (/v1)
+  path_prefix: /v1
+  breaking_changes: >-
+    Announced in the dated changelog and typed "breaking". Two in the public history: v1.0.0
+    (recipient became an object) and v1.2.0 (pricing breakdown removed).
+  header_versioning: none
+  see: changelog/mystars-changelog.yml
+error_envelope:
+  format: custom
+  rfc9457: false
+  content_type: application/json
+  shape: '{ "error": { "code": <stable machine string>, "message": <human text>, "telegram_message?": <verbatim upstream text> } }'
+  codes: [bad_request, unauthorized, forbidden, not_found, conflict, recipient_ineligible, rate_limited, unavailable, internal]
+  guarantee: >-
+    The docs state every error is this envelope and never an HTML page — including a malformed
+    JSON body (400 bad_request) and a body over 256 KB (413 bad_request).
+  see: errors/mystars-problem-types.yml
+rate_limit_signaling:
+  headers: [RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After]
+  status: 429
+  note: >-
+    The headers report whichever bucket is BINDING on that route (general, order-lifecycle, or
+    the tighter upstream-probe cap). The daily-cap and per-recipient-guard 429s carry the error
+    envelope only, with no headers — an agent must handle a header-less 429 too.
+  see: rate-limits/mystars-rate-limits.yml
+money:
+  representation: decimal strings, never floats
+  rule: >-
+    All monetary amounts are decimal strings in the unit named by the adjacent *_units /
+    currency field, and must be treated as exact strings to avoid IEEE-754 precision loss. The
+    Python SDK maps them to Decimal for the same reason.
+  frozen_field_names:
+  - field: amount_ton
+    note: Holds the GRAM fulfilment cost; the name is frozen for wire compatibility after the TON->GRAM rebrand.
+  - field: usdt_per_ton
+    note: The public GRAM<->USDT rate; name frozen for the same reason.
+dry_run_mode:
+  supported: partial
+  note: >-
+    There is no ?dry_run= flag, but the documented call order gives an agent two genuine
+    rehearsal steps before anything irreversible: GET /v1/pricing returns the all-in amount with
+    no side effect, and POST /v1/recipients/check is explicitly read-only and confirms the
+    recipient can receive the item before an order exists. Neither creates an order or takes
+    money. Caveat the provider itself flags: the recipient check fails OPEN, so eligible:true
+    with indeterminate:true means "unknown", not "yes".
+reversibility:
+  grade: verified
+  read_only: false
+  note: >-
+    Unusually well specified for a payments surface: every write path has either an explicit
+    reversal operation or an automatic on-chain reversal, and the docs state the window for
+    each. Nothing below is inferred — the windows are quoted from the "Reversals & delivery" and
+    "When a reversal happens" sections of https://mystars.tg/docs.
+  write_operations:
+  - operation: createOrder
+    path: POST /v1/orders
+    consequence: >-
+      Creates an order in awaiting_payment and returns a treasury address, amount and memo. The
+      order itself takes no money — the caller settles it on-chain separately — so creating one
+      is reversible for as long as it is unpaid.
+    reversal:
+      operation: cancelOrder
+      operationId: cancelOrder
+      path: POST /v1/orders/{id}/cancel
+      window: >-
+        Only while status is awaiting_payment. Any other state returns 409 — you cannot cancel an
+        order that is already paid or processing. The awaiting_payment window is the order's
+        expires_at, which since v1.12.0 (2026-08-04) lands 2 hours out; expires_at on the order
+        is the single source of truth and the docs deliberately no longer quote a duration.
+      docs: https://mystars.tg/docs
+    secondary_reversal:
+      mechanism: automatic on-chain reversal
+      window: >-
+        After payment there is no caller-invoked undo, but MyStars reverses the funds to the
+        paying address, in the currency paid, minus the network fee, in exactly three documented
+        cases: payment mismatch (amount outside the -1% .. +2% tolerance -> failed, underpaid /
+        overpaid), undeliverable (paid but not deliverable -> reversed), and unmatched payment
+        (missing or unrecognised memo -> failed, no_memo / wrong_memo, or expired if it cannot be
+        tied to one order). A payment WITHIN the -1% .. +2% tolerance is treated as exact and is
+        not reversed. Amounts below a small dust threshold are not reversed because the fee would
+        consume them.
+      evidence_field: reversal_tx
+      docs: https://mystars.tg/docs
+  - operation: cancelOrder
+    path: POST /v1/orders/{id}/cancel
+    consequence: Moves an unpaid order to cancelled.
+    reversal: none
+    window: n/a
+    note: >-
+      Terminal and not undoable, but harmless — an unpaid cancelled order has nothing to reverse.
+      The recovery path is to create a new order, which requires a NEW Idempotency-Key.
+  agent_guidance: >-
+    The one irreversible act is sending the on-chain payment. Everything up to that point —
+    quote, recipient check, order create, cancel — is undoable inside a 2-hour window. The docs
+    are explicit that after a payment you should NOT blindly retry: a new Idempotency-Key creates
+    a brand-new order and a second charge, while reusing the SAME key safely re-queries the
+    original. A held status is NOT terminal and must not be re-created.
+cross_links:
+  errors: errors/mystars-problem-types.yml
+  settlement_outcomes: errors/mystars-decline-codes.yml
+  lifecycle: lifecycle/mystars-lifecycle.yml
+  authentication: authentication/mystars-authentication.yml
+  rate_limits: rate-limits/mystars-rate-limits.yml
+  webhooks: asyncapi/mystars-webhooks.yml

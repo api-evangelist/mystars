@@ -1,0 +1,84 @@
+generated: '2026-08-27'
+method: searched
+source: https://mystars.tg/docs
+docs: https://mystars.tg/docs
+note: >-
+  MyStars is an on-chain settlement provider, not a card acquirer, so it has no card decline
+  codes. Its equivalent registry is the failure_reason enum returned on Order and on the terminal
+  orderStatus webhook — the reason a paid or pending order did not become a delivery, and whether
+  the funds came back. Captured verbatim from the "Reversals & delivery" and "When a reversal
+  happens" sections. This complements, and does not replace, errors/mystars-problem-types.yml:
+  problem types are synchronous HTTP failures; these are asynchronous settlement outcomes.
+envelope_field: failure_reason
+carried_on:
+- Order (GET /v1/orders/{id}, GET /v1/orders)
+- orderStatus webhook payload
+companion_fields:
+  reversal_tx: On-chain reference for the returned funds, when a reversal occurred.
+  purchase_tx: On-chain reference for the fulfilment purchase, when delivered.
+  telegram_message: Verbatim user-facing wording from Fragment, when present.
+masked_to_buyer: >-
+  Nothing is masked from the API tenant. telegram_message is Fragment's own end-user wording and
+  is the field intended to be shown to a buyer; failure_reason is the machine string.
+decline_code_count: 6
+decline_codes:
+- code: underpaid
+  terminal_status: failed
+  meaning: >-
+    The amount received was below the accepted tolerance of -1% .. +2% of the quote.
+  funds: Reversed to the paying address, in the currency paid, minus the network fee.
+  action: >-
+    Re-quote and create a NEW order, sending exactly payment.amount. A payment WITHIN the
+    -1% .. +2% band is treated as exact and is not reversed.
+- code: overpaid
+  terminal_status: failed
+  meaning: The amount received was above the +2% tolerance of the quote.
+  funds: Reversed to the paying address, in the currency paid, minus the network fee.
+  action: Send exactly payment.amount on the retry; do not round up.
+- code: no_memo
+  terminal_status: failed
+  meaning: >-
+    A payment arrived with no order reference — the transfer carried no memo. Attribution to a
+    specific pending order is best-effort.
+  funds: Reversed to the sender minus the network fee.
+  action: >-
+    Always send payment.memo (which equals the order id) as the TON transfer comment, or — for
+    usdt_ton — as the jetton forward-payload text comment.
+- code: wrong_memo
+  terminal_status: failed
+  meaning: A payment arrived carrying a memo that matched no order.
+  funds: Reversed to the sender minus the network fee.
+  action: Copy payment.memo verbatim from the create-order response; do not construct your own.
+- code: undeliverable
+  terminal_status: reversed
+  meaning: >-
+    The payment arrived correctly but the item could not be delivered to the recipient after
+    payment.
+  funds: Reversed to the paying address, in the currency paid, minus the network fee.
+  action: >-
+    Pre-flight with POST /v1/recipients/check before ordering. Note the check fails OPEN, so
+    eligible:true with indeterminate:true is "unknown", not a guarantee.
+- code: expired
+  terminal_status: expired
+  meaning: >-
+    No matching payment arrived before the order's expires_at, so the order closed. Can also be
+    the outcome when an unmatched payment cannot be tied to exactly one pending order.
+  funds: >-
+    Nothing to reverse if unpaid. Amounts below a small dust threshold are not reversed because
+    the network fee would consume them.
+  action: >-
+    Create a new order and settle within the window; read expires_at rather than assuming a
+    duration (it moved from 15 minutes to 1 hour to 2 hours across v1.9.0 and v1.12.0).
+non_terminal:
+- status: held
+  meaning: >-
+    Still being processed, or under manual review. NOT terminal and NOT a decline.
+  action: >-
+    Do not treat as final and do not re-create the order. Poll GET /v1/orders/{id} or wait for
+    the webhook — it resolves to delivered or reversed. If it stays held for an extended period,
+    or an order is reversed but the on-chain reversal has not appeared, contact
+    https://t.me/Mystars_support_bot with the order_id.
+tolerance:
+  underpayment: -1%
+  overpayment: '+2%'
+  within_tolerance_treated_as: exact — no reversal

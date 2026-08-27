@@ -1,0 +1,335 @@
+generated: '2026-08-27'
+method: derived
+source: openapi/mystars-faas-openapi.json
+note: Request/response examples and x-codeSamples extracted verbatim from the published OpenAPI 3.1.0.
+  MyStars ships in-spec code samples in four flavours on every operation - cURL, TypeScript SDK, Python
+  SDK and raw Python HTTP - which is unusually complete for a nine-operation API. Nothing here is authored;
+  it is a projection of what the provider already publishes, so an agent can read the examples without
+  parsing the spec.
+operation_count: 9
+operations_with_code_samples: 9
+code_sample_languages:
+  shell: 9
+  typescript: 9
+  python: 18
+examples:
+- operationId: createOrder
+  method: POST
+  path: /v1/orders
+  request_examples:
+  - name: stars
+    summary: 500 Stars to @durov, paid in GRAM
+    value:
+      type: stars
+      recipient:
+        username: durov
+      quantity: 500
+      payment_currency: ton
+      callback_url: https://example.com/webhooks/mystars
+  - name: premium
+    summary: 3 months of Premium, paid in USDT
+    value:
+      type: premium
+      recipient:
+        username: durov
+      months: 3
+      payment_currency: usdt_ton
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl -X POST https://api.mystars.tg/v1/orders \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\" \\\
+      \n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"\
+      type\":\"stars\",\"recipient\":{\"username\":\"durov\"},\"quantity\":500,\"payment_currency\":\"\
+      ton\"}'\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\
+      \n// Pass a STABLE idempotencyKey = your own order id so a retry returns\n// the SAME order instead\
+      \ of creating a duplicate.\nconst order = await client.createOrder(\n  { type: \"stars\", recipient:\
+      \ { username: \"durov\" }, quantity: 500, payment_currency: \"ton\" },\n  { idempotencyKey: `order-${myOrderId}`\
+      \ },\n);\nconsole.log(order.payment); // amount, pay_to_address, memo\n"
+  - lang: python
+    label: Python SDK
+    source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"\
+      MYSTARS_API_KEY\"])\n\n# Pass a STABLE idempotency_key = your own order id so a retry returns\n\
+      # the SAME order instead of creating a duplicate.\norder = client.create_order(\n    type=\"stars\"\
+      ,\n    recipient=\"durov\",\n    quantity=500,\n    payment_currency=\"ton\",\n    idempotency_key=f\"\
+      order-{my_order_id}\",\n)\nprint(order.payment)  # amount, pay_to_address, memo\n"
+  - lang: python
+    label: Python (HTTP)
+    source: "import uuid\n\nimport requests\n\nresp = requests.post(\n    \"https://api.mystars.tg/v1/orders\"\
+      ,\n    headers={\n        \"X-Api-Key\": MYSTARS_API_KEY,\n        \"Idempotency-Key\": str(uuid.uuid4()),\n\
+      \    },\n    json={\n        \"type\": \"stars\",\n        \"recipient\": {\"username\": \"durov\"\
+      },\n        \"quantity\": 500,\n        \"payment_currency\": \"ton\",\n    },\n)\nresp.raise_for_status()\n\
+      print(resp.json())\n"
+- operationId: listOrders
+  method: GET
+  path: /v1/orders
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl \"https://api.mystars.tg/v1/orders?status=awaiting_payment&limit=50\" \\\n  -H \"X-Api-Key:\
+      \ $MYSTARS_API_KEY\"\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\
+      \n// Auto-paginating async iterator — the cursor is handled for you.\nfor await (const order of\
+      \ client.listOrders({ status: \"awaiting_payment\", limit: 50 })) {\n  console.log(order.order_id,\
+      \ order.status);\n}\n"
+  - lang: python
+    label: Python SDK
+    source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"\
+      MYSTARS_API_KEY\"])\n\npage = client.list_orders(status=\"awaiting_payment\", limit=50)\nfor order\
+      \ in page.orders:\n    print(order.order_id, order.status)\n# page.next_cursor → pass back as cursor=\
+      \ for the next page (None = last).\n"
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/orders\",\n    headers={\"\
+      X-Api-Key\": MYSTARS_API_KEY},\n    params={\"status\": \"awaiting_payment\", \"limit\": 50},\n\
+      )\nresp.raise_for_status()\nprint(resp.json())\n"
+- operationId: getOrder
+  method: GET
+  path: /v1/orders/{id}
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl https://api.mystars.tg/v1/orders/7c9e6679-7425-40de-944b-e07fc1f90ae7 \\\n  -H \"X-Api-Key:\
+      \ $MYSTARS_API_KEY\"\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+      const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+      const order = await client.getOrder("7c9e6679-7425-40de-944b-e07fc1f90ae7");
+
+      console.log(order.status);
+
+      '
+  - lang: python
+    label: Python SDK
+    source: 'import os
+
+
+      from mystars_faas import MyStarsClient
+
+
+      client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+      order = client.get_order("7c9e6679-7425-40de-944b-e07fc1f90ae7")
+
+      print(order.status)
+
+      '
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\norder_id = \"7c9e6679-7425-40de-944b-e07fc1f90ae7\"\nresp = requests.get(\n\
+      \    f\"https://api.mystars.tg/v1/orders/{order_id}\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n\
+      )\nresp.raise_for_status()\nprint(resp.json())\n"
+- operationId: cancelOrder
+  method: POST
+  path: /v1/orders/{id}/cancel
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl -X POST https://api.mystars.tg/v1/orders/7c9e6679-7425-40de-944b-e07fc1f90ae7/cancel\
+      \ \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+      const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+      const result = await client.cancelOrder("7c9e6679-7425-40de-944b-e07fc1f90ae7");
+
+      console.log(result.status); // "cancelled"
+
+      '
+  - lang: python
+    label: Python SDK
+    source: 'import os
+
+
+      from mystars_faas import MyStarsClient
+
+
+      client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+      result = client.cancel_order("7c9e6679-7425-40de-944b-e07fc1f90ae7")
+
+      print(result["status"])  # "cancelled"
+
+      '
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\norder_id = \"7c9e6679-7425-40de-944b-e07fc1f90ae7\"\nresp = requests.post(\n\
+      \    f\"https://api.mystars.tg/v1/orders/{order_id}/cancel\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n\
+      )\nresp.raise_for_status()\nprint(resp.json())\n"
+- operationId: checkRecipient
+  method: POST
+  path: /v1/recipients/check
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl -X POST https://api.mystars.tg/v1/recipients/check \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\
+      \ \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"type\":\"stars\",\"recipient\":{\"username\"\
+      :\"durov\"}}'\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\
+      \nconst check = await client.checkRecipient({\n  type: \"stars\",\n  recipient: { username: \"durov\"\
+      \ },\n});\nif (!check.eligible) throw new Error(check.reason ?? \"ineligible\");\n"
+  - lang: python
+    label: Python SDK
+    source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"\
+      MYSTARS_API_KEY\"])\n\ncheck = client.check_recipient(\"durov\", type=\"stars\")\nif not check.eligible:\n\
+      \    raise SystemExit(check.telegram_message)\n"
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\nresp = requests.post(\n    \"https://api.mystars.tg/v1/recipients/check\"\
+      ,\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n    json={\"type\": \"stars\", \"recipient\":\
+      \ {\"username\": \"durov\"}},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+- operationId: getPricing
+  method: GET
+  path: /v1/pricing
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl \"https://api.mystars.tg/v1/pricing?type=stars&quantity=500&payment_currency=ton\" \\\
+      \n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\
+      \nconst quote = await client.getPricing({\n  type: \"stars\",\n  quantity: 500,\n  payment_currency:\
+      \ \"ton\",\n});\nconsole.log(`pay ${quote.amount} ${quote.currency}`);\n"
+  - lang: python
+    label: Python SDK
+    source: 'import os
+
+
+      from mystars_faas import MyStarsClient
+
+
+      client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+      quote = client.get_pricing(type="stars", quantity=500, payment_currency="ton")
+
+      print(quote.amount, quote.currency)
+
+      '
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/pricing\",\n   \
+      \ headers={\"X-Api-Key\": MYSTARS_API_KEY},\n    params={\"type\": \"stars\", \"quantity\": 500,\
+      \ \"payment_currency\": \"ton\"},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+- operationId: getPricingBatch
+  method: GET
+  path: /v1/pricing/batch
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl \"https://api.mystars.tg/v1/pricing/batch?type=stars&quantities=50,100,500&payment_currency=usdt_ton\"\
+      \ \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\
+      \nconst batch = await client.getPricingBatch({\n  quantities: [50, 100, 500],\n  payment_currency:\
+      \ \"usdt_ton\",\n});\nfor (const q of batch.quotes) console.log(q.quantity, q.amount);\n"
+  - lang: python
+    label: Python SDK
+    source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"\
+      MYSTARS_API_KEY\"])\n\nbatch = client.get_pricing_batch(quantities=[50, 100, 500], payment_currency=\"\
+      usdt_ton\")\nfor q in batch.quotes:\n    print(q.quantity, q.amount)\n"
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/pricing/batch\"\
+      ,\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n    params={\"type\": \"stars\", \"quantities\"\
+      : \"50,100,500\", \"payment_currency\": \"usdt_ton\"},\n)\nresp.raise_for_status()\nfor q in resp.json()[\"\
+      quotes\"]:\n    print(q[\"quantity\"], q[\"amount\"])\n"
+- operationId: listCurrencies
+  method: GET
+  path: /v1/currencies
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl https://api.mystars.tg/v1/currencies \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+      const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+      const currencies = await client.listCurrencies();
+
+      console.log(currencies);
+
+      '
+  - lang: python
+    label: Python SDK
+    source: 'import os
+
+
+      from mystars_faas import MyStarsClient
+
+
+      client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+      currencies = client.list_currencies()
+
+      print(currencies)
+
+      '
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/currencies\",\n\
+      \    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+- operationId: listProducts
+  method: GET
+  path: /v1/products
+  code_samples:
+  - lang: shell
+    label: cURL
+    source: "curl https://api.mystars.tg/v1/products \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+  - lang: typescript
+    label: TypeScript SDK
+    source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+      const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+      const products = await client.listProducts();
+
+      console.log(products);
+
+      '
+  - lang: python
+    label: Python SDK
+    source: 'import os
+
+
+      from mystars_faas import MyStarsClient
+
+
+      client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+      products = client.list_products()
+
+      print(products)
+
+      '
+  - lang: python
+    label: Python (HTTP)
+    source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/products\",\n  \
+      \  headers={\"X-Api-Key\": MYSTARS_API_KEY},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
