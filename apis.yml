@@ -1,0 +1,38 @@
+aid: mystars
+name: MyStars FaaS
+description: Public B2B fulfilment API for buying and reselling Telegram Stars and Telegram Premium, paid in GRAM or USDT
+  on the TON network.
+url: https://mystars.tg/apis.json
+created: '2026-07-12'
+modified: '2026-08-27'
+specificationVersion: '0.18'
+maintainers:
+- FN: MyStars.tg
+  url: https://t.me/Mystars_support_bot
+tags:
+- telegram
+- telegram-stars
+- telegram-premium
+- payments
+- crypto
+- ton
+- fulfilment
+apis:
+- aid: mystars.tg:faas:v1
+  name: MyStars FaaS — Fulfilment API
+  description: Pricing, recipient eligibility checks and the full order lifecycle for Telegram Stars & Premium.
+  humanURL: https://mystars.tg/docs
+  baseURL: https://api.mystars.tg
+  tags:
+  - telegram
+  - payments
+  - crypto
+  properties:
+  - type: Documentation
+    url: https://mystars.tg/docs
+  - type: OpenAPI
+    url: https://mystars.tg/openapi.json
+  - type: Signup
+    url: https://t.me/my_stars_tg_bot
+  - type: LLMsTxt
+    url: https://mystars.tg/llms.txt
