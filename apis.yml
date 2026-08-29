@@ -9,6 +9,17 @@ description: >-
   HMAC-signed webhook. The model is non-custodial and no-KYC — there is no prepaid balance and no
   card processor, and a flat 5% margin is already included in every quote. Official TypeScript and
   Python SDKs, plus a CLI, ship on npm and PyPI.
+deliveryModel:
+  model: saas
+  open_source: false
+  commercial: true
+  callable_host: false
+  label: Hosted service · you call their endpoint
+  confidence: medium
+  source:
+  - pricing
+  generated: '2026-08-28'
+  method: derived
 image: https://mystars.tg/icon.png
 url: https://mystars.tg/apis.json
 created: '2026-07-12'
