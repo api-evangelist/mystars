@@ -1,0 +1,715 @@
+openapi: 3.2.0
+info:
+  title: MyStars FaaS — Fulfilment Orders API
+  version: 1.12.0
+  summary: Buy Telegram Stars & Premium for any @username, paid in GRAM (ex TON) or USDT (TON).
+  description: 'MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
+
+
+    Quote a price, check the recipient, create an order, then pay the returned on-chain address. MyStars holds the payment, fulfils delivery through Fragment, and notifies you with a signed webhook when the order is delivered or reversed.
+
+
+    ## Getting an API key
+
+
+    Keys are issued inside our Telegram bot — no dashboard, no signup form. Open [@my_stars_tg_bot](https://t.me/my_stars_tg_bot), tap **API access**, and copy your secret. Send it in the `X-Api-Key` header on every request.
+
+
+    ## Typed SDKs
+
+
+    Skip raw HTTP with an official client: `npm install @mystars-tg/faas-sdk` (TypeScript) or `pip install mystars-faas` (Python). Each wraps every call with retries, idempotency, typed errors, and on-chain payment builders.
+
+
+    ## Documentation
+
+
+    Full guides — quick start, rate limits, idempotency, webhooks, and reversal rules — live at the [developer portal](https://mystars.tg/docs).
+
+    '
+  contact:
+    name: MyStars API support
+    url: https://t.me/Mystars_support_bot
+  license:
+    name: Proprietary
+    url: https://mystars.tg/terms
+servers:
+- url: https://api.mystars.tg
+  description: Production
+security:
+- ApiKeyAuth: []
+tags:
+- name: Orders
+  description: Create, inspect, list and cancel fulfilment orders.
+paths:
+  /v1/orders:
+    post:
+      tags:
+      - Orders
+      operationId: createOrder
+      summary: Create an order
+      description: 'Pre-flight the recipient, quote the price, and create an order in
+
+        `awaiting_payment`. The response `payment` block tells you exactly how
+
+        much to send, to which address, and with which `memo` (the order id).
+
+        An ineligible recipient returns `422 recipient_ineligible` and creates
+
+        **no** order (you are never charged for an undeliverable recipient). If
+
+        eligibility cannot be verified right now (a transient upstream blip), the
+
+        call returns a **retryable `503`** and creates no order — retry shortly
+
+        with the same `Idempotency-Key`.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            examples:
+              stars:
+                summary: 500 Stars to @durov, paid in GRAM
+                value:
+                  type: stars
+                  recipient:
+                    username: durov
+                  quantity: 500
+                  payment_currency: ton
+                  callback_url: https://example.com/webhooks/mystars
+              premium:
+                summary: 3 months of Premium, paid in USDT
+                value:
+                  type: premium
+                  recipient:
+                    username: durov
+                  months: 3
+                  payment_currency: usdt_ton
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl -X POST https://api.mystars.tg/v1/orders \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"type\":\"stars\",\"recipient\":{\"username\":\"durov\"},\"quantity\":500,\"payment_currency\":\"ton\"}'\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\n// Pass a STABLE idempotencyKey = your own order id so a retry returns\n// the SAME order instead of creating a duplicate.\nconst order = await client.createOrder(\n  { type: \"stars\", recipient: { username: \"durov\" }, quantity: 500, payment_currency: \"ton\" },\n  { idempotencyKey: `order-${myOrderId}` },\n);\nconsole.log(order.payment); // amount, pay_to_address, memo\n"
+      - lang: python
+        label: Python SDK
+        source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"MYSTARS_API_KEY\"])\n\n# Pass a STABLE idempotency_key = your own order id so a retry returns\n# the SAME order instead of creating a duplicate.\norder = client.create_order(\n    type=\"stars\",\n    recipient=\"durov\",\n    quantity=500,\n    payment_currency=\"ton\",\n    idempotency_key=f\"order-{my_order_id}\",\n)\nprint(order.payment)  # amount, pay_to_address, memo\n"
+      - lang: python
+        label: Python (HTTP)
+        source: "import uuid\n\nimport requests\n\nresp = requests.post(\n    \"https://api.mystars.tg/v1/orders\",\n    headers={\n        \"X-Api-Key\": MYSTARS_API_KEY,\n        \"Idempotency-Key\": str(uuid.uuid4()),\n    },\n    json={\n        \"type\": \"stars\",\n        \"recipient\": {\"username\": \"durov\"},\n        \"quantity\": 500,\n        \"payment_currency\": \"ton\",\n    },\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: Idempotent replay — the same key + body returns the original order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedOrder'
+        '201':
+          description: Order created (or replayed on an idempotent retry → 200).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedOrder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Idempotency-Key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/RecipientIneligible'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+    get:
+      tags:
+      - Orders
+      operationId: listOrders
+      summary: List your orders
+      description: 'Tenant-scoped list, newest first, keyset-paginated. Pass the returned
+
+        `next_cursor` back as `?cursor=` to page; a null `next_cursor` is the
+
+        last page.
+
+        '
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/OrderStatus'
+        description: Filter by order status.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Opaque cursor from a previous page's `next_cursor`.
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl \"https://api.mystars.tg/v1/orders?status=awaiting_payment&limit=50\" \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\n// Auto-paginating async iterator — the cursor is handled for you.\nfor await (const order of client.listOrders({ status: \"awaiting_payment\", limit: 50 })) {\n  console.log(order.order_id, order.status);\n}\n"
+      - lang: python
+        label: Python SDK
+        source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"MYSTARS_API_KEY\"])\n\npage = client.list_orders(status=\"awaiting_payment\", limit=50)\nfor order in page.orders:\n    print(order.order_id, order.status)\n# page.next_cursor → pass back as cursor= for the next page (None = last).\n"
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/orders\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n    params={\"status\": \"awaiting_payment\", \"limit\": 50},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: A page of orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - orders
+                - next_cursor
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  next_cursor:
+                    type:
+                    - string
+                    - 'null'
+                    description: Pass back as `?cursor=`; null on the last page.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/orders/{id}:
+    get:
+      tags:
+      - Orders
+      operationId: getOrder
+      summary: Get an order
+      description: 'Fetch one order by id. Orders are tenant-isolated: another tenant''s id
+
+        (or an unknown/malformed id) returns `404` — never leaking its existence.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/OrderId'
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl https://api.mystars.tg/v1/orders/7c9e6679-7425-40de-944b-e07fc1f90ae7 \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+          const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+          const order = await client.getOrder("7c9e6679-7425-40de-944b-e07fc1f90ae7");
+
+          console.log(order.status);
+
+          '
+      - lang: python
+        label: Python SDK
+        source: 'import os
+
+
+          from mystars_faas import MyStarsClient
+
+
+          client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+          order = client.get_order("7c9e6679-7425-40de-944b-e07fc1f90ae7")
+
+          print(order.status)
+
+          '
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\norder_id = \"7c9e6679-7425-40de-944b-e07fc1f90ae7\"\nresp = requests.get(\n    f\"https://api.mystars.tg/v1/orders/{order_id}\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/orders/{id}/cancel:
+    post:
+      tags:
+      - Orders
+      operationId: cancelOrder
+      summary: Cancel an order
+      description: 'Cancel an order that is still `awaiting_payment`. Any other state returns
+
+        `409` (you can''t cancel an order that''s already paid or processing).
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/OrderId'
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl -X POST https://api.mystars.tg/v1/orders/7c9e6679-7425-40de-944b-e07fc1f90ae7/cancel \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+          const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+          const result = await client.cancelOrder("7c9e6679-7425-40de-944b-e07fc1f90ae7");
+
+          console.log(result.status); // "cancelled"
+
+          '
+      - lang: python
+        label: Python SDK
+        source: 'import os
+
+
+          from mystars_faas import MyStarsClient
+
+
+          client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+          result = client.cancel_order("7c9e6679-7425-40de-944b-e07fc1f90ae7")
+
+          print(result["status"])  # "cancelled"
+
+          '
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\norder_id = \"7c9e6679-7425-40de-944b-e07fc1f90ae7\"\nresp = requests.post(\n    f\"https://api.mystars.tg/v1/orders/{order_id}/cancel\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: Order cancelled.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - order_id
+                - status
+                properties:
+                  order_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                    - cancelled
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The order is not in `awaiting_payment` and cannot be cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  schemas:
+    Order:
+      type: object
+      required:
+      - order_id
+      - status
+      - type
+      - recipient_username
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        type:
+          $ref: '#/components/schemas/OrderType'
+        recipient_username:
+          type: string
+        quantity:
+          type:
+          - integer
+          - 'null'
+        months:
+          type:
+          - integer
+          - 'null'
+        amount_ton:
+          type:
+          - string
+          - 'null'
+          description: The GRAM fulfilment cost (decimal string), when known. The field name `amount_ton` is frozen for wire compatibility.
+        payment_tx:
+          type:
+          - string
+          - 'null'
+        purchase_tx:
+          type:
+          - string
+          - 'null'
+        failure_reason:
+          type:
+          - string
+          - 'null'
+          description: 'Why the order ended where it did, when not `delivered`: `underpaid` / `overpaid` / `no_memo` / `wrong_memo` (→ `failed`, funds reversed), `undeliverable` (→ `reversed`, funds reversed), or `expired`. Null otherwise. See **Reversals & delivery**.'
+        reversal_tx:
+          type:
+          - string
+          - 'null'
+        telegram_message:
+          type:
+          - string
+          - 'null'
+          description: A verbatim user-facing message from Fragment, when present.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Non-null only while `awaiting_payment`.
+    Recipient:
+      type: object
+      required:
+      - username
+      properties:
+        username:
+          type: string
+          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
+
+            '
+          pattern: ^@?[a-zA-Z0-9_]{1,32}$
+          example: durov
+    PaymentInstruction:
+      type: object
+      description: How to pay for the order. Send EXACTLY `amount` with `memo`.
+      required:
+      - currency
+      - chain
+      - pay_to_address
+      - memo
+      - amount
+      - amount_units
+      - fee
+      properties:
+        currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        chain:
+          type: string
+          example: ton
+        pay_to_address:
+          type: string
+          description: The treasury wallet to pay. The SAME address is returned for both `ton` and `usdt_ton` — a USDT jetton transfer routes by owner, so its destination is this (owner) address, not a derived jetton-wallet address.
+        memo:
+          type: string
+          description: The required transfer memo (equals the order id).
+        amount:
+          type: string
+          description: Exact amount to send, as a decimal string.
+          example: '5.757'
+        amount_units:
+          type: string
+          enum:
+          - ton
+          - usdt
+        fee:
+          description: 'For `usdt_ton` only: an itemisation of the processing fee already INCLUDED in `amount` (the 1% DEX swap fee + 0.5 GRAM swap gas we pass through). `null` for `ton` (no swap, no fee). It does NOT add to `amount` — pay exactly `amount`.'
+          oneOf:
+          - $ref: '#/components/schemas/FeeBreakdown'
+          - type: 'null'
+    OrderStatus:
+      type: string
+      description: Lifecycle status. `awaiting_payment` is the only cancellable state.
+      enum:
+      - received
+      - awaiting_payment
+      - paid
+      - reserved
+      - swapping
+      - funding
+      - purchasing
+      - fulfilling
+      - completed
+      - delivered
+      - failed
+      - reversed
+      - expired
+      - held
+      - cancelled
+    CreatedOrder:
+      type: object
+      required:
+      - order_id
+      - status
+      - type
+      - quantity
+      - months
+      - payment
+      - expires_at
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        type:
+          type: string
+          description: The product this order is for — echoed back from your request.
+          enum:
+          - stars
+          - premium
+        quantity:
+          type:
+          - integer
+          - 'null'
+          description: 'The number of Stars ordered (when `type=stars`); `null` for Premium.
+
+            '
+          example: 500
+        months:
+          type:
+          - integer
+          - 'null'
+          description: 'The Premium subscription length in months ordered (when `type=premium`); `null` for Stars.
+
+            '
+          example: null
+        payment:
+          $ref: '#/components/schemas/PaymentInstruction'
+        expires_at:
+          type: string
+          format: date-time
+          description: After this, an unpaid order expires and is cleaned up.
+    CreateOrderRequest:
+      type: object
+      required:
+      - type
+      - recipient
+      properties:
+        type:
+          $ref: '#/components/schemas/OrderType'
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+        quantity:
+          type: integer
+          minimum: 50
+          maximum: 1000000
+          description: Number of Stars. Required when `type=stars`. Must be in [50, 1000000].
+        months:
+          type: integer
+          enum:
+          - 3
+          - 6
+          - 12
+          description: Premium subscription length in months. Required when `type=premium`. Must be 3, 6, or 12.
+        payment_currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        callback_url:
+          type: string
+          format: uri
+          description: Optional HTTPS URL for the signed order-status webhook. Must be a publicly reachable `https://` URL — loopback addresses, private-network hosts, and non-HTTPS schemes are rejected with `400 bad_request`.
+    OrderType:
+      type: string
+      enum:
+      - stars
+      - premium
+    FeeBreakdown:
+      type: object
+      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
+      required:
+      - subtotal
+      - processing_fee
+      - total
+      - description
+      - currency
+      properties:
+        subtotal:
+          type: string
+          description: The item price before the processing fee, as a decimal string (USDT).
+          example: '13.18'
+        processing_fee:
+          type: string
+          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
+          example: '0.92'
+        total:
+          type: string
+          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
+          example: '14.1'
+        description:
+          type: string
+          description: Human-readable label for the fee components.
+          example: 1% swap + 0.5 GRAM gas
+        currency:
+          type: string
+          enum:
+          - usdt
+          description: The unit of the fee amounts (always `usdt`).
+    PaymentCurrency:
+      type: string
+      enum:
+      - ton
+      - usdt_ton
+      default: ton
+      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              description: Stable machine error code to branch on.
+              enum:
+              - bad_request
+              - unauthorized
+              - forbidden
+              - not_found
+              - conflict
+              - recipient_ineligible
+              - rate_limited
+              - unavailable
+              - internal
+            message:
+              type: string
+              description: Human-readable description.
+            telegram_message:
+              type: string
+              description: A verbatim user-facing message from Fragment, when present.
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      description: The order id (UUID, also used as the on-chain payment memo).
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 'A unique key for this create attempt. Retrying with the same key and an
+
+        identical body returns the original order; a different body is a 409.
+
+        '
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: No such order for this tenant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RecipientIneligible:
+      description: The recipient cannot receive this item. No order is created.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unavailable:
+      description: 'A required source was temporarily unavailable — either the price source,
+
+        or recipient eligibility could not be verified right now. **Retryable**:
+
+        reuse the same `Idempotency-Key` and try again shortly. No order is created
+
+        and you are not charged.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: 'Your secret API key. Get one from [@my_stars_tg_bot](https://t.me/my_stars_tg_bot) → **API access**, then send it in the `X-Api-Key` header on every request. Treat it like a password — anyone with the key can create orders on your tenant, read your order history, and cancel unpaid orders. Each order is settled by its own on-chain payment, so the key by itself cannot move funds. Rotate it any time with `/api_rotate` in the bot.
+
+        '
+externalDocs:
+  description: MyStars FaaS API documentation
+  url: https://mystars.tg/docs

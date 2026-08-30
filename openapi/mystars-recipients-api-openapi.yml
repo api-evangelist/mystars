@@ -1,0 +1,292 @@
+openapi: 3.2.0
+info:
+  title: MyStars FaaS — Fulfilment Recipients API
+  version: 1.12.0
+  summary: Buy Telegram Stars & Premium for any @username, paid in GRAM (ex TON) or USDT (TON).
+  description: 'MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
+
+
+    Quote a price, check the recipient, create an order, then pay the returned on-chain address. MyStars holds the payment, fulfils delivery through Fragment, and notifies you with a signed webhook when the order is delivered or reversed.
+
+
+    ## Getting an API key
+
+
+    Keys are issued inside our Telegram bot — no dashboard, no signup form. Open [@my_stars_tg_bot](https://t.me/my_stars_tg_bot), tap **API access**, and copy your secret. Send it in the `X-Api-Key` header on every request.
+
+
+    ## Typed SDKs
+
+
+    Skip raw HTTP with an official client: `npm install @mystars-tg/faas-sdk` (TypeScript) or `pip install mystars-faas` (Python). Each wraps every call with retries, idempotency, typed errors, and on-chain payment builders.
+
+
+    ## Documentation
+
+
+    Full guides — quick start, rate limits, idempotency, webhooks, and reversal rules — live at the [developer portal](https://mystars.tg/docs).
+
+    '
+  contact:
+    name: MyStars API support
+    url: https://t.me/Mystars_support_bot
+  license:
+    name: Proprietary
+    url: https://mystars.tg/terms
+servers:
+- url: https://api.mystars.tg
+  description: Production
+security:
+- ApiKeyAuth: []
+tags:
+- name: Recipients
+  description: Resolve a recipient and check delivery eligibility before ordering.
+paths:
+  /v1/recipients/check:
+    post:
+      tags:
+      - Recipients
+      operationId: checkRecipient
+      summary: Check a recipient
+      description: 'Resolve a `@username` and check whether they can receive the requested
+
+        item, before you create an order. Read-only and fail-open — a transient
+
+        oracle hiccup resolves to `eligible: true` rather than blocking you.
+
+
+        **Why `type` is required.** The check runs against the very product you
+
+        intend to order, so it must know which one. Pass `type: stars` to resolve a
+
+        **Stars** recipient, or `type: premium` to resolve a **Premium-gift**
+
+        recipient (the Premium path also takes `months` — 3, 6 or 12). Always check
+
+        with the same `type` you''ll use in `POST /v1/orders`: a Stars check does not
+
+        prove a Premium gift will be accepted, and vice-versa.
+
+
+        > ⚠️ **A recipient who already has an active Premium subscription cannot be
+
+        > gifted Premium.** Telegram blocks gifting a Premium subscription to anyone
+
+        > whose subscription is still active (for example, an annual plan that has
+
+        > not expired yet) — this is **Telegram''s restriction, not ours**. The check
+
+        > surfaces it as `eligible: false` with `reason: "already_subscribed"` and
+
+        > Telegram''s verbatim wording in `telegram_message`. The same recipient also
+
+        > makes `POST /v1/orders` fail with `422 recipient_ineligible`: no order is
+
+        > created and you are not charged. Pre-flighting Premium recipients here is
+
+        > the cheapest way to tell your user *before* they pay.
+
+
+        **Rate limit:** this endpoint carries a tighter per-tenant cap of 60
+
+        requests/min (in addition to the standard per-tenant budget), because each
+
+        call performs a live upstream lookup. If you exceed this,
+
+        you receive a `429` and should back off for the remainder of the minute.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipientCheckRequest'
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl -X POST https://api.mystars.tg/v1/recipients/check \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"type\":\"stars\",\"recipient\":{\"username\":\"durov\"}}'\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\nconst check = await client.checkRecipient({\n  type: \"stars\",\n  recipient: { username: \"durov\" },\n});\nif (!check.eligible) throw new Error(check.reason ?? \"ineligible\");\n"
+      - lang: python
+        label: Python SDK
+        source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"MYSTARS_API_KEY\"])\n\ncheck = client.check_recipient(\"durov\", type=\"stars\")\nif not check.eligible:\n    raise SystemExit(check.telegram_message)\n"
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\nresp = requests.post(\n    \"https://api.mystars.tg/v1/recipients/check\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n    json={\"type\": \"stars\", \"recipient\": {\"username\": \"durov\"}},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: Resolution + eligibility result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipientCheckResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Recipient:
+      type: object
+      required:
+      - username
+      properties:
+        username:
+          type: string
+          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
+
+            '
+          pattern: ^@?[a-zA-Z0-9_]{1,32}$
+          example: durov
+    RecipientCheckResult:
+      type: object
+      required:
+      - resolved
+      - eligible
+      properties:
+        resolved:
+          type: boolean
+          description: Whether the @username was found on Telegram.
+        eligible:
+          type: boolean
+          description: Whether the recipient can receive the item.
+        recipient_name:
+          type:
+          - string
+          - 'null'
+          description: 'The resolved recipient''s display name from Fragment, when available (best-effort) — useful to confirm you''re sending to the right person. `null` if Fragment returned no name.
+
+            '
+        reason:
+          type:
+          - string
+          - 'null'
+          description: 'Permanent-rejection class, set only when `eligible` is false: `already_subscribed`, `not_found`, or `ineligible`. `null` when eligible.
+
+            '
+          enum:
+          - already_subscribed
+          - not_found
+          - ineligible
+          - null
+        telegram_message:
+          type:
+          - string
+          - 'null'
+          description: 'Fragment''s raw rejection text, propagated verbatim — set only when `eligible` is false. `null` when eligible.
+
+            '
+        indeterminate:
+          type: boolean
+          default: false
+          description: '`true` when the eligibility probe could not reach a verdict and this endpoint FAILED OPEN — `eligible` is then a permissive default, not a measurement. `false` on every real verdict (eligible or not).
+
+
+            Treat an indeterminate response as "unknown", never as "yes": the recipient has not been checked. It is safe to proceed to `POST /v1/orders` (which runs its own authoritative check), but do not present it to a buyer as a confirmed-deliverable recipient.
+
+
+            Always present since 1.11.0. Clients written against an earlier version saw the field absent; absent and `false` mean the same thing.
+
+            '
+    OrderType:
+      type: string
+      enum:
+      - stars
+      - premium
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              description: Stable machine error code to branch on.
+              enum:
+              - bad_request
+              - unauthorized
+              - forbidden
+              - not_found
+              - conflict
+              - recipient_ineligible
+              - rate_limited
+              - unavailable
+              - internal
+            message:
+              type: string
+              description: Human-readable description.
+            telegram_message:
+              type: string
+              description: A verbatim user-facing message from Fragment, when present.
+    RecipientCheckRequest:
+      type: object
+      required:
+      - type
+      - recipient
+      properties:
+        type:
+          description: 'The product to check — and the product you intend to order. `stars` resolves a Stars recipient; `premium` resolves a Premium-gift recipient and uses `months`. Must match the `type` you pass to `POST /v1/orders`; a Stars check does not prove a Premium gift will be accepted (Premium has extra eligibility rules — see the endpoint description).
+
+            '
+          allOf:
+          - $ref: '#/components/schemas/OrderType'
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+        months:
+          type: integer
+          enum:
+          - 3
+          - 6
+          - 12
+          description: Only meaningful for `type=premium` (defaults to 3). Must be 3, 6, or 12.
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: 'Your secret API key. Get one from [@my_stars_tg_bot](https://t.me/my_stars_tg_bot) → **API access**, then send it in the `X-Api-Key` header on every request. Treat it like a password — anyone with the key can create orders on your tenant, read your order history, and cancel unpaid orders. Each order is settled by its own on-chain payment, so the key by itself cannot move funds. Rotate it any time with `/api_rotate` in the bot.
+
+        '
+externalDocs:
+  description: MyStars FaaS API documentation
+  url: https://mystars.tg/docs

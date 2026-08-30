@@ -1,0 +1,148 @@
+openapi: 3.2.0
+info:
+  title: MyStars FaaS — Fulfilment API
+  version: 1.12.0
+  summary: Buy Telegram Stars & Premium for any @username, paid in GRAM (ex TON) or USDT (TON).
+  description: 'MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
+
+
+    Quote a price, check the recipient, create an order, then pay the returned on-chain address. MyStars holds the payment, fulfils delivery through Fragment, and notifies you with a signed webhook when the order is delivered or reversed.
+
+
+    ## Getting an API key
+
+
+    Keys are issued inside our Telegram bot — no dashboard, no signup form. Open [@my_stars_tg_bot](https://t.me/my_stars_tg_bot), tap **API access**, and copy your secret. Send it in the `X-Api-Key` header on every request.
+
+
+    ## Typed SDKs
+
+
+    Skip raw HTTP with an official client: `npm install @mystars-tg/faas-sdk` (TypeScript) or `pip install mystars-faas` (Python). Each wraps every call with retries, idempotency, typed errors, and on-chain payment builders.
+
+
+    ## Documentation
+
+
+    Full guides — quick start, rate limits, idempotency, webhooks, and reversal rules — live at the [developer portal](https://mystars.tg/docs).
+
+    '
+  contact:
+    name: MyStars API support
+    url: https://t.me/Mystars_support_bot
+  license:
+    name: Proprietary
+    url: https://mystars.tg/terms
+servers:
+- url: https://api.mystars.tg
+  description: Production
+security:
+- ApiKeyAuth: []
+tags:
+- name: MyStars FaaS — Fulfilment API
+paths: {}
+webhooks:
+  orderStatus:
+    post:
+      operationId: orderStatusWebhook
+      summary: Order status callback
+      description: 'When an order reaches a terminal status (`delivered`, `failed`,
+
+        `reversed`, `expired`) we `POST` this event to your `callback_url`.
+
+
+        Verify authenticity with the `X-Faas-Signature` header — it''s the
+
+        hex `HMAC-SHA256` of the **exact raw request body** under your webhook
+
+        secret (the standard Stripe/GitHub signing scheme). Respond `2xx` to
+
+        acknowledge; non-2xx is retried with exponential backoff, then
+
+        dead-lettered. The body (and signature) are stable across retries.
+
+
+        **Delivery constraints.** Your endpoint must respond within **5 seconds**
+
+        (connect + headers + body timeout each). HTTP redirects are not followed —
+
+        the `callback_url` must be the final destination. A timeout or non-2xx
+
+        response triggers the retry/dead-letter path exactly as a connection error
+
+        would; it never blocks order processing.
+
+
+        **Secret rotation (rollover).** During the grace window after you rotate
+
+        your webhook secret, this header may carry **multiple comma-separated
+
+        signatures** (the new and the previous secret). Treat the header as a
+
+        comma-separated list and accept the request if **any** entry matches your
+
+        secret — so you can switch from the old secret to the new one at any point
+
+        in the window without dropping a webhook. Outside a rotation it is a single
+
+        signature, so naive single-value verification keeps working day to day.
+
+        '
+      parameters:
+      - name: X-Faas-Signature
+        in: header
+        required: true
+        description: Hex HMAC-SHA256 of the raw body under your webhook secret. May be a comma-separated list of signatures during a secret-rotation rollover — accept if ANY matches your secret.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - order_id
+              - status
+              properties:
+                order_id:
+                  type: string
+                  format: uuid
+                status:
+                  type: string
+                  enum:
+                  - delivered
+                  - failed
+                  - reversed
+                  - expired
+                failure_reason:
+                  type:
+                  - string
+                  - 'null'
+                  description: Why a non-`delivered` order ended where it did — `underpaid` / `overpaid` (amount mismatch → `failed`, funds reversed), `no_memo` / `wrong_memo` (an unmatched payment with a missing / unrecognised memo → `failed`, funds reversed to the sender), `undeliverable` (`reversed`, funds reversed), or `expired` (no payment within the window). Null on `delivered`. See **Reversals & delivery** above for the full meaning of each.
+                  example: undeliverable
+                purchase_tx:
+                  type:
+                  - string
+                  - 'null'
+                reversal_tx:
+                  type:
+                  - string
+                  - 'null'
+      responses:
+        '200':
+          description: Acknowledged. Any 2xx stops retries.
+      tags:
+      - MyStars FaaS — Fulfilment API
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: 'Your secret API key. Get one from [@my_stars_tg_bot](https://t.me/my_stars_tg_bot) → **API access**, then send it in the `X-Api-Key` header on every request. Treat it like a password — anyone with the key can create orders on your tenant, read your order history, and cancel unpaid orders. Each order is settled by its own on-chain payment, so the key by itself cannot move funds. Rotate it any time with `/api_rotate` in the bot.
+
+        '
+externalDocs:
+  description: MyStars FaaS API documentation
+  url: https://mystars.tg/docs

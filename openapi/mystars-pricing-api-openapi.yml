@@ -1,0 +1,689 @@
+openapi: 3.2.0
+info:
+  title: MyStars FaaS — Fulfilment Pricing API
+  version: 1.12.0
+  summary: Buy Telegram Stars & Premium for any @username, paid in GRAM (ex TON) or USDT (TON).
+  description: 'MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
+
+
+    Quote a price, check the recipient, create an order, then pay the returned on-chain address. MyStars holds the payment, fulfils delivery through Fragment, and notifies you with a signed webhook when the order is delivered or reversed.
+
+
+    ## Getting an API key
+
+
+    Keys are issued inside our Telegram bot — no dashboard, no signup form. Open [@my_stars_tg_bot](https://t.me/my_stars_tg_bot), tap **API access**, and copy your secret. Send it in the `X-Api-Key` header on every request.
+
+
+    ## Typed SDKs
+
+
+    Skip raw HTTP with an official client: `npm install @mystars-tg/faas-sdk` (TypeScript) or `pip install mystars-faas` (Python). Each wraps every call with retries, idempotency, typed errors, and on-chain payment builders.
+
+
+    ## Documentation
+
+
+    Full guides — quick start, rate limits, idempotency, webhooks, and reversal rules — live at the [developer portal](https://mystars.tg/docs).
+
+    '
+  contact:
+    name: MyStars API support
+    url: https://t.me/Mystars_support_bot
+  license:
+    name: Proprietary
+    url: https://mystars.tg/terms
+servers:
+- url: https://api.mystars.tg
+  description: Production
+security:
+- ApiKeyAuth: []
+tags:
+- name: Pricing
+  description: Quote a price; list supported payment currencies and products.
+paths:
+  /v1/pricing:
+    get:
+      tags:
+      - Pricing
+      operationId: getPricing
+      summary: Quote a price
+      description: 'Get a quote for an item in a payment currency. The `amount` is the full,
+
+        all-in total you''ll send on-chain (in `currency`) — there''s nothing else to
+
+        add.
+
+
+        The quote echoes back **what it priced** — `type` plus `quantity` (for
+
+        Stars) or `months` (for Premium); the field that doesn''t apply is `null` —
+
+        so the `amount` is self-describing and you never have to correlate it to your
+
+        request.
+
+
+        The response also carries `quoted_at` + `valid_until` (a re-quote hint —
+
+        the price tracks the market and is recomputed about every minute; it is
+
+        locked only when you create an order) and `usdt_per_ton` (the current
+
+        public GRAM↔USDT rate, for your own conversion; `null` if
+
+        momentarily unavailable).
+
+
+        **Rate limit:** this endpoint carries a tighter per-tenant cap of 60
+
+        requests/min (in addition to the standard per-tenant budget). If you
+
+        exceed this, you receive a `429` and should back off for the remainder of
+
+        the minute.
+
+        '
+      parameters:
+      - name: type
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - stars
+          - premium
+      - name: quantity
+        in: query
+        required: false
+        description: Required when `type=stars` — the number of Stars (50–1000000).
+        schema:
+          type: integer
+          minimum: 50
+          maximum: 1000000
+      - name: months
+        in: query
+        required: false
+        description: Required when `type=premium` — the subscription length in months (3, 6, or 12).
+        schema:
+          type: integer
+          enum:
+          - 3
+          - 6
+          - 12
+      - name: payment_currency
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/PaymentCurrency'
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl \"https://api.mystars.tg/v1/pricing?type=stars&quantity=500&payment_currency=ton\" \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\nconst quote = await client.getPricing({\n  type: \"stars\",\n  quantity: 500,\n  payment_currency: \"ton\",\n});\nconsole.log(`pay ${quote.amount} ${quote.currency}`);\n"
+      - lang: python
+        label: Python SDK
+        source: 'import os
+
+
+          from mystars_faas import MyStarsClient
+
+
+          client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+          quote = client.get_pricing(type="stars", quantity=500, payment_currency="ton")
+
+          print(quote.amount, quote.currency)
+
+          '
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/pricing\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n    params={\"type\": \"stars\", \"quantity\": 500, \"payment_currency\": \"ton\"},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: A price quote.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/pricing/batch:
+    get:
+      tags:
+      - Pricing
+      operationId: getPricingBatch
+      summary: Quote many Stars quantities in one request
+      description: 'Quote a whole LIST of Stars quantities in a single request — built for
+
+        storefronts that refresh preview prices for an entire pack catalog. One
+
+        batch call consumes ONE unit of your request budget (and one probe
+
+        unit), instead of one per pack.
+
+
+        Stars-only (`type=stars`). The quantity list is deduped and returned
+
+        sorted ascending, up to **200 values** per call. Each entry carries the
+
+        same `amount` + `fee` itemisation as `GET /v1/pricing` for that
+
+        quantity — the two endpoints agree cent-for-cent. Shared response
+
+        fields (`usdt_per_ton`, `quoted_at`, `valid_until`) are hoisted to the
+
+        top level.
+
+
+        **Rate limit:** same tighter 60 req/min per-tenant probe cap as
+
+        `GET /v1/pricing` — but since a single call covers your whole catalog,
+
+        one call per refresh window is all you need.
+
+        '
+      parameters:
+      - name: type
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - stars
+      - name: quantities
+        in: query
+        required: true
+        description: Comma-separated Stars quantities (each 50–1000000, max 200 values).
+        schema:
+          type: string
+        example: 50,100,500,1000
+      - name: payment_currency
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/PaymentCurrency'
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl \"https://api.mystars.tg/v1/pricing/batch?type=stars&quantities=50,100,500&payment_currency=usdt_ton\" \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: "import { MyStarsClient } from \"@mystars-tg/faas-sdk\";\n\nconst client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);\n\nconst batch = await client.getPricingBatch({\n  quantities: [50, 100, 500],\n  payment_currency: \"usdt_ton\",\n});\nfor (const q of batch.quotes) console.log(q.quantity, q.amount);\n"
+      - lang: python
+        label: Python SDK
+        source: "import os\n\nfrom mystars_faas import MyStarsClient\n\nclient = MyStarsClient.production(os.environ[\"MYSTARS_API_KEY\"])\n\nbatch = client.get_pricing_batch(quantities=[50, 100, 500], payment_currency=\"usdt_ton\")\nfor q in batch.quotes:\n    print(q.quantity, q.amount)\n"
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/pricing/batch\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n    params={\"type\": \"stars\", \"quantities\": \"50,100,500\", \"payment_currency\": \"usdt_ton\"},\n)\nresp.raise_for_status()\nfor q in resp.json()[\"quotes\"]:\n    print(q[\"quantity\"], q[\"amount\"])\n"
+      responses:
+        '200':
+          description: One quote per requested quantity (deduped, ascending).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteBatch'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/currencies:
+    get:
+      tags:
+      - Pricing
+      operationId: listCurrencies
+      summary: List payment currencies
+      description: The two on-chain currencies you can pay in.
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl https://api.mystars.tg/v1/currencies \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+          const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+          const currencies = await client.listCurrencies();
+
+          console.log(currencies);
+
+          '
+      - lang: python
+        label: Python SDK
+        source: 'import os
+
+
+          from mystars_faas import MyStarsClient
+
+
+          client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+          currencies = client.list_currencies()
+
+          print(currencies)
+
+          '
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/currencies\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: Supported payment currencies.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - currencies
+                properties:
+                  currencies:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - code
+                      - chain
+                      - name
+                      properties:
+                        code:
+                          $ref: '#/components/schemas/PaymentCurrency'
+                        chain:
+                          type: string
+                          example: ton
+                        name:
+                          type: string
+                          example: GRAM
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/products:
+    get:
+      tags:
+      - Pricing
+      operationId: listProducts
+      summary: List available products
+      description: 'The product catalog — the two product **types** you can sell and the
+
+        buyable shape of each. Static, price-free metadata (call `GET /v1/pricing`
+
+        for a price): use it to build your own catalog/UI and to learn the bounds
+
+        the order endpoints enforce.
+
+
+        Each entry''s `parameter` names the request field to send to `/v1/pricing`
+
+        and `/v1/orders` (`quantity` for stars, `months` for premium). A `null`
+
+        `values` means a continuous integer range `[min, max]` (stars — any
+
+        quantity in range, no fixed denominations); a non-null `values` is the
+
+        exact allowed set (premium — `[3, 6, 12]`).
+
+        '
+      x-codeSamples:
+      - lang: shell
+        label: cURL
+        source: "curl https://api.mystars.tg/v1/products \\\n  -H \"X-Api-Key: $MYSTARS_API_KEY\"\n"
+      - lang: typescript
+        label: TypeScript SDK
+        source: 'import { MyStarsClient } from "@mystars-tg/faas-sdk";
+
+
+          const client = MyStarsClient.production(process.env.MYSTARS_API_KEY!);
+
+
+          const products = await client.listProducts();
+
+          console.log(products);
+
+          '
+      - lang: python
+        label: Python SDK
+        source: 'import os
+
+
+          from mystars_faas import MyStarsClient
+
+
+          client = MyStarsClient.production(os.environ["MYSTARS_API_KEY"])
+
+
+          products = client.list_products()
+
+          print(products)
+
+          '
+      - lang: python
+        label: Python (HTTP)
+        source: "import requests\n\nresp = requests.get(\n    \"https://api.mystars.tg/v1/products\",\n    headers={\"X-Api-Key\": MYSTARS_API_KEY},\n)\nresp.raise_for_status()\nprint(resp.json())\n"
+      responses:
+        '200':
+          description: The product catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - products
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unavailable:
+      description: 'A required source was temporarily unavailable — either the price source,
+
+        or recipient eligibility could not be verified right now. **Retryable**:
+
+        reuse the same `Idempotency-Key` and try again shortly. No order is created
+
+        and you are not charged.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Product:
+      type: object
+      required:
+      - type
+      - name
+      - parameter
+      - min
+      - max
+      - values
+      properties:
+        type:
+          type: string
+          description: The product type — pass this as `type` to `/v1/pricing` and `/v1/orders`.
+          enum:
+          - stars
+          - premium
+        name:
+          type: string
+          description: Human-readable product name.
+          example: Telegram Stars
+        parameter:
+          type: string
+          description: 'The request field that carries the amount for this product — `quantity` for stars, `months` for premium.
+
+            '
+          enum:
+          - quantity
+          - months
+        min:
+          type: integer
+          description: Smallest buyable value (inclusive).
+          example: 50
+        max:
+          type: integer
+          description: Largest buyable value (inclusive).
+          example: 1000000
+        values:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+          description: 'The exact allowed values when the product is a fixed set (premium → `[3, 6, 12]`); `null` when any integer in `[min, max]` is valid (stars).
+
+            '
+          example: null
+    QuoteBatch:
+      type: object
+      required:
+      - type
+      - currency
+      - quotes
+      - usdt_per_ton
+      - quoted_at
+      - valid_until
+      properties:
+        type:
+          type: string
+          enum:
+          - stars
+          description: Batch pricing is Stars-only.
+        currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        quotes:
+          type: array
+          description: One entry per requested quantity (deduped, ascending).
+          items:
+            type: object
+            required:
+            - quantity
+            - amount
+            - fee
+            properties:
+              quantity:
+                type: integer
+                description: The number of Stars this entry priced.
+                example: 500
+              amount:
+                type: string
+                description: 'The full, all-in total to pay for this quantity, as a decimal string in the top-level `currency` — identical to what `GET /v1/pricing` returns for the same quantity.
+
+                  '
+                example: '5.757'
+              fee:
+                description: 'For `usdt_ton` only: the same processing-fee itemisation as `GET /v1/pricing` (already included in `amount`). `null` for `ton`.'
+                oneOf:
+                - $ref: '#/components/schemas/FeeBreakdown'
+                - type: 'null'
+        usdt_per_ton:
+          type: string
+          nullable: true
+          description: Indicative USDT per 1 GRAM (informational; the field name `usdt_per_ton` is frozen for wire compatibility; `null` if unavailable).
+          example: '2.85'
+        quoted_at:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+          description: Re-quote hint — prices are locked only at order creation.
+    FeeBreakdown:
+      type: object
+      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
+      required:
+      - subtotal
+      - processing_fee
+      - total
+      - description
+      - currency
+      properties:
+        subtotal:
+          type: string
+          description: The item price before the processing fee, as a decimal string (USDT).
+          example: '13.18'
+        processing_fee:
+          type: string
+          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
+          example: '0.92'
+        total:
+          type: string
+          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
+          example: '14.1'
+        description:
+          type: string
+          description: Human-readable label for the fee components.
+          example: 1% swap + 0.5 GRAM gas
+        currency:
+          type: string
+          enum:
+          - usdt
+          description: The unit of the fee amounts (always `usdt`).
+    PaymentCurrency:
+      type: string
+      enum:
+      - ton
+      - usdt_ton
+      default: ton
+      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
+    Quote:
+      type: object
+      required:
+      - type
+      - quantity
+      - months
+      - amount
+      - currency
+      - fee
+      - usdt_per_ton
+      - quoted_at
+      - valid_until
+      properties:
+        type:
+          type: string
+          description: The product this quote priced — echoed back from your request.
+          enum:
+          - stars
+          - premium
+        quantity:
+          type:
+          - integer
+          - 'null'
+          description: 'The number of Stars priced (when `type=stars`); `null` for Premium.
+
+            '
+          example: 500
+        months:
+          type:
+          - integer
+          - 'null'
+          description: 'The Premium subscription length in months priced (when `type=premium`); `null` for Stars.
+
+            '
+          example: null
+        amount:
+          type: string
+          description: 'The full, all-in total to pay, as a decimal string in `currency`. Nothing else to add — send exactly this amount on-chain.
+
+            '
+          example: '5.757'
+        currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        fee:
+          description: 'For `usdt_ton` only: an itemisation of the processing fee already INCLUDED in `amount` (1% DEX swap fee + 0.5 GRAM swap gas). `null` for `ton`. It does NOT add to `amount` — `fee.total` equals `amount`.'
+          oneOf:
+          - $ref: '#/components/schemas/FeeBreakdown'
+          - type: 'null'
+        usdt_per_ton:
+          type: string
+          nullable: true
+          description: 'The current indicative USDT per 1 GRAM (the field name `usdt_per_ton` is frozen for wire compatibility) — public market data you can use to convert GRAM↔USDT in your own interface. `null` if the rate is momentarily unavailable. This is NOT the amount you pay (that is `amount`); it is informational only.
+
+            '
+          example: '2.85'
+        quoted_at:
+          type: string
+          format: date-time
+          description: Server timestamp (ISO 8601) when this quote was computed.
+          example: '2026-06-21T14:03:12.000Z'
+        valid_until:
+          type: string
+          format: date-time
+          description: 'A RE-QUOTE HINT (ISO 8601): the price tracks the market and is recomputed about every minute, so re-fetch after this time. It is **not** a price lock — the price is locked only when you create an order (`POST /v1/orders`), which fixes the amount for the order''s payment window. Read `expires_at` on the order for that deadline — it is authoritative; do not assume a fixed duration.
+
+            '
+          example: '2026-06-21T14:04:12.000Z'
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              description: Stable machine error code to branch on.
+              enum:
+              - bad_request
+              - unauthorized
+              - forbidden
+              - not_found
+              - conflict
+              - recipient_ineligible
+              - rate_limited
+              - unavailable
+              - internal
+            message:
+              type: string
+              description: Human-readable description.
+            telegram_message:
+              type: string
+              description: A verbatim user-facing message from Fragment, when present.
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: 'Your secret API key. Get one from [@my_stars_tg_bot](https://t.me/my_stars_tg_bot) → **API access**, then send it in the `X-Api-Key` header on every request. Treat it like a password — anyone with the key can create orders on your tenant, read your order history, and cancel unpaid orders. Each order is settled by its own on-chain payment, so the key by itself cannot move funds. Rotate it any time with `/api_rotate` in the bot.
+
+        '
+externalDocs:
+  description: MyStars FaaS API documentation
+  url: https://mystars.tg/docs
