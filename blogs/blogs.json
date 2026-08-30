@@ -1,0 +1,14 @@
+{
+  "repo": "mystars",
+  "feeds": [
+    {
+      "source": "https://t.me/Mystars_support_bot",
+      "feed_url": "https://t.me/Mystars_support_bot",
+      "title": "",
+      "saved": 0,
+      "method": "none"
+    }
+  ],
+  "post_count": 0,
+  "fetched": "2026-08-30T22:33:40Z"
+}

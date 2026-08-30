@@ -30,6 +30,17 @@ maintainers:
   url: https://t.me/Mystars_support_bot
   email: admin@mystars.tg
 tags:
+- Telegram
+- telegram-stars
+- telegram-premium
+- Payments
+- Crypto
+- TON
+- Fulfilment
+- Blockchain
+- Digital Goods
+- reseller-api
+tags_raw:
 - telegram
 - telegram-stars
 - telegram-premium
@@ -65,6 +76,8 @@ apis:
   humanURL: https://mystars.tg/docs
   baseURL: https://api.mystars.tg
   tags:
+  - Order
+  tags_raw:
   - Orders
   properties:
   - type: OpenAPI
