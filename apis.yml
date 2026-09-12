@@ -135,6 +135,8 @@ apis:
   - type: LLMsTxt
     url: https://mystars.tg/llms.txt
 common:
+- type: Website
+  url: https://www.mystars.tg/
 - type: VulnerabilityDisclosure
   url: security/mystars-vulnerability-disclosure.yml
 - type: DomainSecurity
