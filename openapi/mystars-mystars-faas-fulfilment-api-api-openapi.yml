@@ -3,30 +3,7 @@ info:
   title: MyStars FaaS — Fulfilment API
   version: 1.12.0
   summary: Buy Telegram Stars & Premium for any @username, paid in GRAM (ex TON) or USDT (TON).
-  description: 'MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
-
-
-    Quote a price, check the recipient, create an order, then pay the returned on-chain address. MyStars holds the payment, fulfils delivery through Fragment, and notifies you with a signed webhook when the order is delivered or reversed.
-
-
-    ## Getting an API key
-
-
-    Keys are issued inside our Telegram bot — no dashboard, no signup form. Open [@my_stars_tg_bot](https://t.me/my_stars_tg_bot), tap **API access**, and copy your secret. Send it in the `X-Api-Key` header on every request.
-
-
-    ## Typed SDKs
-
-
-    Skip raw HTTP with an official client: `npm install @mystars-tg/faas-sdk` (TypeScript) or `pip install mystars-faas` (Python). Each wraps every call with retries, idempotency, typed errors, and on-chain payment builders.
-
-
-    ## Documentation
-
-
-    Full guides — quick start, rate limits, idempotency, webhooks, and reversal rules — live at the [developer portal](https://mystars.tg/docs).
-
-    '
+  description: MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
   contact:
     name: MyStars API support
     url: https://t.me/Mystars_support_bot
@@ -85,9 +62,7 @@ webhooks:
 
         in the window without dropping a webhook. Outside a rotation it is a single
 
-        signature, so naive single-value verification keeps working day to day.
-
-        '
+        signature, so naive single-value verification keeps working day to day.'
       parameters:
       - name: X-Faas-Signature
         in: header

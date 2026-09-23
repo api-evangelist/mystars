@@ -3,30 +3,7 @@ info:
   title: MyStars FaaS — Fulfilment Recipients API
   version: 1.12.0
   summary: Buy Telegram Stars & Premium for any @username, paid in GRAM (ex TON) or USDT (TON).
-  description: 'MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
-
-
-    Quote a price, check the recipient, create an order, then pay the returned on-chain address. MyStars holds the payment, fulfils delivery through Fragment, and notifies you with a signed webhook when the order is delivered or reversed.
-
-
-    ## Getting an API key
-
-
-    Keys are issued inside our Telegram bot — no dashboard, no signup form. Open [@my_stars_tg_bot](https://t.me/my_stars_tg_bot), tap **API access**, and copy your secret. Send it in the `X-Api-Key` header on every request.
-
-
-    ## Typed SDKs
-
-
-    Skip raw HTTP with an official client: `npm install @mystars-tg/faas-sdk` (TypeScript) or `pip install mystars-faas` (Python). Each wraps every call with retries, idempotency, typed errors, and on-chain payment builders.
-
-
-    ## Documentation
-
-
-    Full guides — quick start, rate limits, idempotency, webhooks, and reversal rules — live at the [developer portal](https://mystars.tg/docs).
-
-    '
+  description: MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
   contact:
     name: MyStars API support
     url: https://t.me/Mystars_support_bot
@@ -93,9 +70,7 @@ paths:
 
         call performs a live upstream lookup. If you exceed this,
 
-        you receive a `429` and should back off for the remainder of the minute.
-
-        '
+        you receive a `429` and should back off for the remainder of the minute.'
       requestBody:
         required: true
         content:
@@ -129,38 +104,42 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 components:
-  responses:
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    RateLimited:
-      description: 'A rate limit was reached — the per-minute request budget, the tighter
-
-        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
-
-        per-recipient flood guard. See **Rate limits** in the overview. The
-
-        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error:
-              code: rate_limited
-              message: rate limit exceeded
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
   schemas:
+    OrderType:
+      type: string
+      enum:
+      - stars
+      - premium
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              description: Stable machine error code to branch on.
+              enum:
+              - bad_request
+              - unauthorized
+              - forbidden
+              - not_found
+              - conflict
+              - recipient_ineligible
+              - rate_limited
+              - unavailable
+              - internal
+            message:
+              type: string
+              description: Human-readable description.
+            telegram_message:
+              type: string
+              description: A verbatim user-facing message from Fragment, when present.
     Recipient:
       type: object
       required:
@@ -173,6 +152,27 @@ components:
             '
           pattern: ^@?[a-zA-Z0-9_]{1,32}$
           example: durov
+    RecipientCheckRequest:
+      type: object
+      required:
+      - type
+      - recipient
+      properties:
+        type:
+          description: 'The product to check — and the product you intend to order. `stars` resolves a Stars recipient; `premium` resolves a Premium-gift recipient and uses `months`. Must match the `type` you pass to `POST /v1/orders`; a Stars check does not prove a Premium gift will be accepted (Premium has extra eligibility rules — see the endpoint description).
+
+            '
+          allOf:
+          - $ref: '#/components/schemas/OrderType'
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+        months:
+          type: integer
+          enum:
+          - 3
+          - 6
+          - 12
+          description: Only meaningful for `type=premium` (defaults to 3). Must be 3, 6, or 12.
     RecipientCheckResult:
       type: object
       required:
@@ -223,62 +223,37 @@ components:
             Always present since 1.11.0. Clients written against an earlier version saw the field absent; absent and `false` mean the same thing.
 
             '
-    OrderType:
-      type: string
-      enum:
-      - stars
-      - premium
-    Error:
-      type: object
-      required:
-      - error
-      properties:
-        error:
-          type: object
-          required:
-          - code
-          - message
-          properties:
-            code:
-              type: string
-              description: Stable machine error code to branch on.
-              enum:
-              - bad_request
-              - unauthorized
-              - forbidden
-              - not_found
-              - conflict
-              - recipient_ineligible
-              - rate_limited
-              - unavailable
-              - internal
-            message:
-              type: string
-              description: Human-readable description.
-            telegram_message:
-              type: string
-              description: A verbatim user-facing message from Fragment, when present.
-    RecipientCheckRequest:
-      type: object
-      required:
-      - type
-      - recipient
-      properties:
-        type:
-          description: 'The product to check — and the product you intend to order. `stars` resolves a Stars recipient; `premium` resolves a Premium-gift recipient and uses `months`. Must match the `type` you pass to `POST /v1/orders`; a Stars check does not prove a Premium gift will be accepted (Premium has extra eligibility rules — see the endpoint description).
+  responses:
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
 
-            '
-          allOf:
-          - $ref: '#/components/schemas/OrderType'
-        recipient:
-          $ref: '#/components/schemas/Recipient'
-        months:
-          type: integer
-          enum:
-          - 3
-          - 6
-          - 12
-          description: Only meaningful for `type=premium` (defaults to 3). Must be 3, 6, or 12.
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

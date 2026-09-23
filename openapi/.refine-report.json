@@ -1,0 +1,28 @@
+{
+  "provider": "mystars",
+  "sources": [
+    "_original/mystars-faas-openapi.json"
+  ],
+  "outputs": [
+    "mystars-mystars-faas-fulfilment-api-api-openapi.yml",
+    "mystars-orders-api-openapi.yml",
+    "mystars-pricing-api-openapi.yml",
+    "mystars-recipients-api-openapi.yml"
+  ],
+  "archived": [],
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "sourced from openapi/_original/ (1 archived document(s)); previously refined output at the top level was skipped rather than re-split",
+    "mystars-faas-openapi.json: upgraded openapi 3.1.0 -> OpenAPI 3.2.0",
+    "mystars-faas-openapi.json: tagged webhooks POST orderStatus -> MyStars FaaS \u2014 Fulfilment API",
+    "mystars-faas-openapi.json: declared missing tag: MyStars FaaS \u2014 Fulfilment API",
+    "apis.yml register: already-registered"
+  ],
+  "skipped": [
+    "mystars-mystars-faas-fulfilment-api-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "mystars-orders-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "mystars-pricing-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "mystars-recipients-api-openapi.yml: previously refined output, superseded by openapi/_original/"
+  ]
+}

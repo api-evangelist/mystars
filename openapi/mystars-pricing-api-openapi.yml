@@ -3,30 +3,7 @@ info:
   title: MyStars FaaS — Fulfilment Pricing API
   version: 1.12.0
   summary: Buy Telegram Stars & Premium for any @username, paid in GRAM (ex TON) or USDT (TON).
-  description: 'MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
-
-
-    Quote a price, check the recipient, create an order, then pay the returned on-chain address. MyStars holds the payment, fulfils delivery through Fragment, and notifies you with a signed webhook when the order is delivered or reversed.
-
-
-    ## Getting an API key
-
-
-    Keys are issued inside our Telegram bot — no dashboard, no signup form. Open [@my_stars_tg_bot](https://t.me/my_stars_tg_bot), tap **API access**, and copy your secret. Send it in the `X-Api-Key` header on every request.
-
-
-    ## Typed SDKs
-
-
-    Skip raw HTTP with an official client: `npm install @mystars-tg/faas-sdk` (TypeScript) or `pip install mystars-faas` (Python). Each wraps every call with retries, idempotency, typed errors, and on-chain payment builders.
-
-
-    ## Documentation
-
-
-    Full guides — quick start, rate limits, idempotency, webhooks, and reversal rules — live at the [developer portal](https://mystars.tg/docs).
-
-    '
+  description: MyStars FaaS is a public B2B API for buying and reselling **Telegram Stars** and **Telegram Premium**, delivered to any Telegram `@username` and paid in **GRAM (ex TON)** or **USDT (TON)**.
   contact:
     name: MyStars API support
     url: https://t.me/Mystars_support_bot
@@ -81,9 +58,7 @@ paths:
 
         exceed this, you receive a `429` and should back off for the remainder of
 
-        the minute.
-
-        '
+        the minute.'
       parameters:
       - name: type
         in: query
@@ -189,9 +164,7 @@ paths:
 
         `GET /v1/pricing` — but since a single call covers your whole catalog,
 
-        one call per refresh window is all you need.
-
-        '
+        one call per refresh window is all you need.'
       parameters:
       - name: type
         in: query
@@ -337,9 +310,7 @@ paths:
 
         quantity in range, no fixed denominations); a non-null `values` is the
 
-        exact allowed set (premium — `[3, 6, 12]`).
-
-        '
+        exact allowed set (premium — `[3, 6, 12]`).'
       x-codeSamples:
       - lang: shell
         label: cURL
@@ -395,98 +366,75 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 components:
-  responses:
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unavailable:
-      description: 'A required source was temporarily unavailable — either the price source,
-
-        or recipient eligibility could not be verified right now. **Retryable**:
-
-        reuse the same `Idempotency-Key` and try again shortly. No order is created
-
-        and you are not charged.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    RateLimited:
-      description: 'A rate limit was reached — the per-minute request budget, the tighter
-
-        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
-
-        per-recipient flood guard. See **Rate limits** in the overview. The
-
-        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error:
-              code: rate_limited
-              message: rate limit exceeded
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
   schemas:
-    Product:
+    PaymentCurrency:
+      type: string
+      enum:
+      - ton
+      - usdt_ton
+      default: ton
+      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
+    Error:
       type: object
       required:
-      - type
-      - name
-      - parameter
-      - min
-      - max
-      - values
+      - error
       properties:
-        type:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              description: Stable machine error code to branch on.
+              enum:
+              - bad_request
+              - unauthorized
+              - forbidden
+              - not_found
+              - conflict
+              - recipient_ineligible
+              - rate_limited
+              - unavailable
+              - internal
+            message:
+              type: string
+              description: Human-readable description.
+            telegram_message:
+              type: string
+              description: A verbatim user-facing message from Fragment, when present.
+    FeeBreakdown:
+      type: object
+      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
+      required:
+      - subtotal
+      - processing_fee
+      - total
+      - description
+      - currency
+      properties:
+        subtotal:
           type: string
-          description: The product type — pass this as `type` to `/v1/pricing` and `/v1/orders`.
+          description: The item price before the processing fee, as a decimal string (USDT).
+          example: '13.18'
+        processing_fee:
+          type: string
+          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
+          example: '0.92'
+        total:
+          type: string
+          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
+          example: '14.1'
+        description:
+          type: string
+          description: Human-readable label for the fee components.
+          example: 1% swap + 0.5 GRAM gas
+        currency:
+          type: string
           enum:
-          - stars
-          - premium
-        name:
-          type: string
-          description: Human-readable product name.
-          example: Telegram Stars
-        parameter:
-          type: string
-          description: 'The request field that carries the amount for this product — `quantity` for stars, `months` for premium.
-
-            '
-          enum:
-          - quantity
-          - months
-        min:
-          type: integer
-          description: Smallest buyable value (inclusive).
-          example: 50
-        max:
-          type: integer
-          description: Largest buyable value (inclusive).
-          example: 1000000
-        values:
-          type:
-          - array
-          - 'null'
-          items:
-            type: integer
-          description: 'The exact allowed values when the product is a fixed set (premium → `[3, 6, 12]`); `null` when any integer in `[min, max]` is valid (stars).
-
-            '
-          example: null
+          - usdt
+          description: The unit of the fee amounts (always `usdt`).
     QuoteBatch:
       type: object
       required:
@@ -541,44 +489,52 @@ components:
           type: string
           format: date-time
           description: Re-quote hint — prices are locked only at order creation.
-    FeeBreakdown:
+    Product:
       type: object
-      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
       required:
-      - subtotal
-      - processing_fee
-      - total
-      - description
-      - currency
+      - type
+      - name
+      - parameter
+      - min
+      - max
+      - values
       properties:
-        subtotal:
+        type:
           type: string
-          description: The item price before the processing fee, as a decimal string (USDT).
-          example: '13.18'
-        processing_fee:
-          type: string
-          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
-          example: '0.92'
-        total:
-          type: string
-          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
-          example: '14.1'
-        description:
-          type: string
-          description: Human-readable label for the fee components.
-          example: 1% swap + 0.5 GRAM gas
-        currency:
-          type: string
+          description: The product type — pass this as `type` to `/v1/pricing` and `/v1/orders`.
           enum:
-          - usdt
-          description: The unit of the fee amounts (always `usdt`).
-    PaymentCurrency:
-      type: string
-      enum:
-      - ton
-      - usdt_ton
-      default: ton
-      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
+          - stars
+          - premium
+        name:
+          type: string
+          description: Human-readable product name.
+          example: Telegram Stars
+        parameter:
+          type: string
+          description: 'The request field that carries the amount for this product — `quantity` for stars, `months` for premium.
+
+            '
+          enum:
+          - quantity
+          - months
+        min:
+          type: integer
+          description: Smallest buyable value (inclusive).
+          example: 50
+        max:
+          type: integer
+          description: Largest buyable value (inclusive).
+          example: 1000000
+        values:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+          description: 'The exact allowed values when the product is a fixed set (premium → `[3, 6, 12]`); `null` when any integer in `[min, max]` is valid (stars).
+
+            '
+          example: null
     Quote:
       type: object
       required:
@@ -646,36 +602,51 @@ components:
 
             '
           example: '2026-06-21T14:04:12.000Z'
-    Error:
-      type: object
-      required:
-      - error
-      properties:
-        error:
-          type: object
-          required:
-          - code
-          - message
-          properties:
-            code:
-              type: string
-              description: Stable machine error code to branch on.
-              enum:
-              - bad_request
-              - unauthorized
-              - forbidden
-              - not_found
-              - conflict
-              - recipient_ineligible
-              - rate_limited
-              - unavailable
-              - internal
-            message:
-              type: string
-              description: Human-readable description.
-            telegram_message:
-              type: string
-              description: A verbatim user-facing message from Fragment, when present.
+  responses:
+    Unavailable:
+      description: 'A required source was temporarily unavailable — either the price source,
+
+        or recipient eligibility could not be verified right now. **Retryable**:
+
+        reuse the same `Idempotency-Key` and try again shortly. No order is created
+
+        and you are not charged.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
