@@ -366,14 +366,52 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 components:
+  responses:
+    Unavailable:
+      description: 'A required source was temporarily unavailable — either the price source,
+
+        or recipient eligibility could not be verified right now. **Retryable**:
+
+        reuse the same `Idempotency-Key` and try again shortly. No order is created
+
+        and you are not charged.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
   schemas:
-    PaymentCurrency:
-      type: string
-      enum:
-      - ton
-      - usdt_ton
-      default: ton
-      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
     Error:
       type: object
       required:
@@ -404,37 +442,6 @@ components:
             telegram_message:
               type: string
               description: A verbatim user-facing message from Fragment, when present.
-    FeeBreakdown:
-      type: object
-      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
-      required:
-      - subtotal
-      - processing_fee
-      - total
-      - description
-      - currency
-      properties:
-        subtotal:
-          type: string
-          description: The item price before the processing fee, as a decimal string (USDT).
-          example: '13.18'
-        processing_fee:
-          type: string
-          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
-          example: '0.92'
-        total:
-          type: string
-          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
-          example: '14.1'
-        description:
-          type: string
-          description: Human-readable label for the fee components.
-          example: 1% swap + 0.5 GRAM gas
-        currency:
-          type: string
-          enum:
-          - usdt
-          description: The unit of the fee amounts (always `usdt`).
     QuoteBatch:
       type: object
       required:
@@ -602,51 +609,44 @@ components:
 
             '
           example: '2026-06-21T14:04:12.000Z'
-  responses:
-    Unavailable:
-      description: 'A required source was temporarily unavailable — either the price source,
-
-        or recipient eligibility could not be verified right now. **Retryable**:
-
-        reuse the same `Idempotency-Key` and try again shortly. No order is created
-
-        and you are not charged.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    RateLimited:
-      description: 'A rate limit was reached — the per-minute request budget, the tighter
-
-        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
-
-        per-recipient flood guard. See **Rate limits** in the overview. The
-
-        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error:
-              code: rate_limited
-              message: rate limit exceeded
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
+    PaymentCurrency:
+      type: string
+      enum:
+      - ton
+      - usdt_ton
+      default: ton
+      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
+    FeeBreakdown:
+      type: object
+      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
+      required:
+      - subtotal
+      - processing_fee
+      - total
+      - description
+      - currency
+      properties:
+        subtotal:
+          type: string
+          description: The item price before the processing fee, as a decimal string (USDT).
+          example: '13.18'
+        processing_fee:
+          type: string
+          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
+          example: '0.92'
+        total:
+          type: string
+          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
+          example: '14.1'
+        description:
+          type: string
+          description: Human-readable label for the fee components.
+          example: 1% swap + 0.5 GRAM gas
+        currency:
+          type: string
+          enum:
+          - usdt
+          description: The unit of the fee amounts (always `usdt`).
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

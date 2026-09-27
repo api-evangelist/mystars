@@ -105,11 +105,6 @@ paths:
           $ref: '#/components/responses/RateLimited'
 components:
   schemas:
-    OrderType:
-      type: string
-      enum:
-      - stars
-      - premium
     Error:
       type: object
       required:
@@ -140,18 +135,6 @@ components:
             telegram_message:
               type: string
               description: A verbatim user-facing message from Fragment, when present.
-    Recipient:
-      type: object
-      required:
-      - username
-      properties:
-        username:
-          type: string
-          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
-
-            '
-          pattern: ^@?[a-zA-Z0-9_]{1,32}$
-          example: durov
     RecipientCheckRequest:
       type: object
       required:
@@ -173,6 +156,18 @@ components:
           - 6
           - 12
           description: Only meaningful for `type=premium` (defaults to 3). Must be 3, 6, or 12.
+    Recipient:
+      type: object
+      required:
+      - username
+      properties:
+        username:
+          type: string
+          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
+
+            '
+          pattern: ^@?[a-zA-Z0-9_]{1,32}$
+          example: durov
     RecipientCheckResult:
       type: object
       required:
@@ -223,7 +218,24 @@ components:
             Always present since 1.11.0. Clients written against an earlier version saw the field absent; absent and `false` mean the same thing.
 
             '
+    OrderType:
+      type: string
+      enum:
+      - stars
+      - premium
   responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     RateLimited:
       description: 'A rate limit was reached — the per-minute request budget, the tighter
 
@@ -242,18 +254,6 @@ components:
             error:
               code: rate_limited
               message: rate limit exceeded
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
