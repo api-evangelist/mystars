@@ -337,14 +337,8 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
+    NotFound:
+      description: No such order for this tenant.
       content:
         application/json:
           schema:
@@ -367,32 +361,47 @@ components:
             error:
               code: rate_limited
               message: rate limit exceeded
-    NotFound:
-      description: No such order for this tenant.
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
-    OrderStatus:
-      type: string
-      description: Lifecycle status. `awaiting_payment` is the only cancellable state.
-      enum:
-      - received
-      - awaiting_payment
-      - paid
-      - reserved
-      - swapping
-      - funding
-      - purchasing
-      - fulfilling
-      - completed
-      - delivered
-      - failed
-      - reversed
-      - expired
-      - held
-      - cancelled
+    CreateOrderRequest:
+      type: object
+      required:
+      - type
+      - recipient
+      properties:
+        type:
+          $ref: '#/components/schemas/OrderType'
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+        quantity:
+          type: integer
+          minimum: 50
+          maximum: 1000000
+          description: Number of Stars. Required when `type=stars`. Must be in [50, 1000000].
+        months:
+          type: integer
+          enum:
+          - 3
+          - 6
+          - 12
+          description: Premium subscription length in months. Required when `type=premium`. Must be 3, 6, or 12.
+        payment_currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        callback_url:
+          type: string
+          format: uri
+          description: Optional HTTPS URL for the signed order-status webhook. Must be a publicly reachable `https://` URL — loopback addresses, private-network hosts, and non-HTTPS schemes are rejected with `400 bad_request`.
     Error:
       type: object
       required:
@@ -423,6 +432,18 @@ components:
             telegram_message:
               type: string
               description: A verbatim user-facing message from Fragment, when present.
+    PaymentCurrency:
+      type: string
+      enum:
+      - ton
+      - usdt_ton
+      default: ton
+      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
+    OrderType:
+      type: string
+      enum:
+      - stars
+      - premium
     PaymentInstruction:
       type: object
       description: How to pay for the order. Send EXACTLY `amount` with `memo`.
@@ -472,110 +493,25 @@ components:
             '
           pattern: ^@?[a-zA-Z0-9_]{1,32}$
           example: durov
-    OrderType:
+    OrderStatus:
       type: string
+      description: Lifecycle status. `awaiting_payment` is the only cancellable state.
       enum:
-      - stars
-      - premium
-    CreateOrderRequest:
-      type: object
-      required:
-      - type
-      - recipient
-      properties:
-        type:
-          $ref: '#/components/schemas/OrderType'
-        recipient:
-          $ref: '#/components/schemas/Recipient'
-        quantity:
-          type: integer
-          minimum: 50
-          maximum: 1000000
-          description: Number of Stars. Required when `type=stars`. Must be in [50, 1000000].
-        months:
-          type: integer
-          enum:
-          - 3
-          - 6
-          - 12
-          description: Premium subscription length in months. Required when `type=premium`. Must be 3, 6, or 12.
-        payment_currency:
-          $ref: '#/components/schemas/PaymentCurrency'
-        callback_url:
-          type: string
-          format: uri
-          description: Optional HTTPS URL for the signed order-status webhook. Must be a publicly reachable `https://` URL — loopback addresses, private-network hosts, and non-HTTPS schemes are rejected with `400 bad_request`.
-    PaymentCurrency:
-      type: string
-      enum:
-      - ton
-      - usdt_ton
-      default: ton
-      description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
-    Order:
-      type: object
-      required:
-      - order_id
-      - status
-      - type
-      - recipient_username
-      properties:
-        order_id:
-          type: string
-          format: uuid
-        status:
-          $ref: '#/components/schemas/OrderStatus'
-        type:
-          $ref: '#/components/schemas/OrderType'
-        recipient_username:
-          type: string
-        quantity:
-          type:
-          - integer
-          - 'null'
-        months:
-          type:
-          - integer
-          - 'null'
-        amount_ton:
-          type:
-          - string
-          - 'null'
-          description: The GRAM fulfilment cost (decimal string), when known. The field name `amount_ton` is frozen for wire compatibility.
-        payment_tx:
-          type:
-          - string
-          - 'null'
-        purchase_tx:
-          type:
-          - string
-          - 'null'
-        failure_reason:
-          type:
-          - string
-          - 'null'
-          description: 'Why the order ended where it did, when not `delivered`: `underpaid` / `overpaid` / `no_memo` / `wrong_memo` (→ `failed`, funds reversed), `undeliverable` (→ `reversed`, funds reversed), or `expired`. Null otherwise. See **Reversals & delivery**.'
-        reversal_tx:
-          type:
-          - string
-          - 'null'
-        telegram_message:
-          type:
-          - string
-          - 'null'
-          description: A verbatim user-facing message from Fragment, when present.
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        expires_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: Non-null only while `awaiting_payment`.
+      - received
+      - awaiting_payment
+      - paid
+      - reserved
+      - swapping
+      - funding
+      - purchasing
+      - fulfilling
+      - completed
+      - delivered
+      - failed
+      - reversed
+      - expired
+      - held
+      - cancelled
     CreatedOrder:
       type: object
       required:
@@ -651,6 +587,70 @@ components:
           enum:
           - usdt
           description: The unit of the fee amounts (always `usdt`).
+    Order:
+      type: object
+      required:
+      - order_id
+      - status
+      - type
+      - recipient_username
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        type:
+          $ref: '#/components/schemas/OrderType'
+        recipient_username:
+          type: string
+        quantity:
+          type:
+          - integer
+          - 'null'
+        months:
+          type:
+          - integer
+          - 'null'
+        amount_ton:
+          type:
+          - string
+          - 'null'
+          description: The GRAM fulfilment cost (decimal string), when known. The field name `amount_ton` is frozen for wire compatibility.
+        payment_tx:
+          type:
+          - string
+          - 'null'
+        purchase_tx:
+          type:
+          - string
+          - 'null'
+        failure_reason:
+          type:
+          - string
+          - 'null'
+          description: 'Why the order ended where it did, when not `delivered`: `underpaid` / `overpaid` / `no_memo` / `wrong_memo` (→ `failed`, funds reversed), `undeliverable` (→ `reversed`, funds reversed), or `expired`. Null otherwise. See **Reversals & delivery**.'
+        reversal_tx:
+          type:
+          - string
+          - 'null'
+        telegram_message:
+          type:
+          - string
+          - 'null'
+          description: A verbatim user-facing message from Fragment, when present.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Non-null only while `awaiting_payment`.
   parameters:
     OrderId:
       name: id

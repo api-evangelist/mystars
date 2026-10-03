@@ -366,136 +366,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 components:
-  responses:
-    Unavailable:
-      description: 'A required source was temporarily unavailable — either the price source,
-
-        or recipient eligibility could not be verified right now. **Retryable**:
-
-        reuse the same `Idempotency-Key` and try again shortly. No order is created
-
-        and you are not charged.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    RateLimited:
-      description: 'A rate limit was reached — the per-minute request budget, the tighter
-
-        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
-
-        per-recipient flood guard. See **Rate limits** in the overview. The
-
-        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error:
-              code: rate_limited
-              message: rate limit exceeded
   schemas:
-    Error:
-      type: object
-      required:
-      - error
-      properties:
-        error:
-          type: object
-          required:
-          - code
-          - message
-          properties:
-            code:
-              type: string
-              description: Stable machine error code to branch on.
-              enum:
-              - bad_request
-              - unauthorized
-              - forbidden
-              - not_found
-              - conflict
-              - recipient_ineligible
-              - rate_limited
-              - unavailable
-              - internal
-            message:
-              type: string
-              description: Human-readable description.
-            telegram_message:
-              type: string
-              description: A verbatim user-facing message from Fragment, when present.
-    QuoteBatch:
-      type: object
-      required:
-      - type
-      - currency
-      - quotes
-      - usdt_per_ton
-      - quoted_at
-      - valid_until
-      properties:
-        type:
-          type: string
-          enum:
-          - stars
-          description: Batch pricing is Stars-only.
-        currency:
-          $ref: '#/components/schemas/PaymentCurrency'
-        quotes:
-          type: array
-          description: One entry per requested quantity (deduped, ascending).
-          items:
-            type: object
-            required:
-            - quantity
-            - amount
-            - fee
-            properties:
-              quantity:
-                type: integer
-                description: The number of Stars this entry priced.
-                example: 500
-              amount:
-                type: string
-                description: 'The full, all-in total to pay for this quantity, as a decimal string in the top-level `currency` — identical to what `GET /v1/pricing` returns for the same quantity.
-
-                  '
-                example: '5.757'
-              fee:
-                description: 'For `usdt_ton` only: the same processing-fee itemisation as `GET /v1/pricing` (already included in `amount`). `null` for `ton`.'
-                oneOf:
-                - $ref: '#/components/schemas/FeeBreakdown'
-                - type: 'null'
-        usdt_per_ton:
-          type: string
-          nullable: true
-          description: Indicative USDT per 1 GRAM (informational; the field name `usdt_per_ton` is frozen for wire compatibility; `null` if unavailable).
-          example: '2.85'
-        quoted_at:
-          type: string
-          format: date-time
-        valid_until:
-          type: string
-          format: date-time
-          description: Re-quote hint — prices are locked only at order creation.
     Product:
       type: object
       required:
@@ -542,6 +413,36 @@ components:
 
             '
           example: null
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              description: Stable machine error code to branch on.
+              enum:
+              - bad_request
+              - unauthorized
+              - forbidden
+              - not_found
+              - conflict
+              - recipient_ineligible
+              - rate_limited
+              - unavailable
+              - internal
+            message:
+              type: string
+              description: Human-readable description.
+            telegram_message:
+              type: string
+              description: A verbatim user-facing message from Fragment, when present.
     Quote:
       type: object
       required:
@@ -616,6 +517,60 @@ components:
       - usdt_ton
       default: ton
       description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
+    QuoteBatch:
+      type: object
+      required:
+      - type
+      - currency
+      - quotes
+      - usdt_per_ton
+      - quoted_at
+      - valid_until
+      properties:
+        type:
+          type: string
+          enum:
+          - stars
+          description: Batch pricing is Stars-only.
+        currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        quotes:
+          type: array
+          description: One entry per requested quantity (deduped, ascending).
+          items:
+            type: object
+            required:
+            - quantity
+            - amount
+            - fee
+            properties:
+              quantity:
+                type: integer
+                description: The number of Stars this entry priced.
+                example: 500
+              amount:
+                type: string
+                description: 'The full, all-in total to pay for this quantity, as a decimal string in the top-level `currency` — identical to what `GET /v1/pricing` returns for the same quantity.
+
+                  '
+                example: '5.757'
+              fee:
+                description: 'For `usdt_ton` only: the same processing-fee itemisation as `GET /v1/pricing` (already included in `amount`). `null` for `ton`.'
+                oneOf:
+                - $ref: '#/components/schemas/FeeBreakdown'
+                - type: 'null'
+        usdt_per_ton:
+          type: string
+          nullable: true
+          description: Indicative USDT per 1 GRAM (informational; the field name `usdt_per_ton` is frozen for wire compatibility; `null` if unavailable).
+          example: '2.85'
+        quoted_at:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+          description: Re-quote hint — prices are locked only at order creation.
     FeeBreakdown:
       type: object
       description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
@@ -647,6 +602,51 @@ components:
           enum:
           - usdt
           description: The unit of the fee amounts (always `usdt`).
+  responses:
+    Unavailable:
+      description: 'A required source was temporarily unavailable — either the price source,
+
+        or recipient eligibility could not be verified right now. **Retryable**:
+
+        reuse the same `Idempotency-Key` and try again shortly. No order is created
+
+        and you are not charged.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
