@@ -140,18 +140,6 @@ components:
       enum:
       - stars
       - premium
-    Recipient:
-      type: object
-      required:
-      - username
-      properties:
-        username:
-          type: string
-          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
-
-            '
-          pattern: ^@?[a-zA-Z0-9_]{1,32}$
-          example: durov
     RecipientCheckRequest:
       type: object
       required:
@@ -223,7 +211,31 @@ components:
             Always present since 1.11.0. Clients written against an earlier version saw the field absent; absent and `false` mean the same thing.
 
             '
+    Recipient:
+      type: object
+      required:
+      - username
+      properties:
+        username:
+          type: string
+          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
+
+            '
+          pattern: ^@?[a-zA-Z0-9_]{1,32}$
+          example: durov
   responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     RateLimited:
       description: 'A rate limit was reached — the per-minute request budget, the tighter
 
@@ -242,18 +254,6 @@ components:
             error:
               code: rate_limited
               message: rate limit exceeded
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
