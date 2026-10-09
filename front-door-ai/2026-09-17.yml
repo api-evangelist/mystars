@@ -7,14 +7,17 @@ front_door_ai:
   probed_at: '2026-09-17'
   host: www.mystars.tg
   final_host: mystars.tg
-  ownership: inherited
+  ownership: own
   owner: mystars
   shares_host_with: null
-  inherited_from: mystars.tg
+  inherited_from: null
+  alias_of: mystars.tg
   verdict: silent
-  score: null
+  score: 0
+  band: 1
+  band_label: silent
   host_score: 0
-  density: null
+  density: 0.0
   words: 1449
   tiers:
     agentic: 0
