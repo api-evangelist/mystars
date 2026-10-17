@@ -105,6 +105,32 @@ paths:
           $ref: '#/components/responses/RateLimited'
 components:
   schemas:
+    RecipientCheckRequest:
+      type: object
+      required:
+      - type
+      - recipient
+      properties:
+        type:
+          description: 'The product to check — and the product you intend to order. `stars` resolves a Stars recipient; `premium` resolves a Premium-gift recipient and uses `months`. Must match the `type` you pass to `POST /v1/orders`; a Stars check does not prove a Premium gift will be accepted (Premium has extra eligibility rules — see the endpoint description).
+
+            '
+          allOf:
+          - $ref: '#/components/schemas/OrderType'
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+        months:
+          type: integer
+          enum:
+          - 3
+          - 6
+          - 12
+          description: Only meaningful for `type=premium` (defaults to 3). Must be 3, 6, or 12.
+    OrderType:
+      type: string
+      enum:
+      - stars
+      - premium
     Error:
       type: object
       required:
@@ -135,32 +161,6 @@ components:
             telegram_message:
               type: string
               description: A verbatim user-facing message from Fragment, when present.
-    OrderType:
-      type: string
-      enum:
-      - stars
-      - premium
-    RecipientCheckRequest:
-      type: object
-      required:
-      - type
-      - recipient
-      properties:
-        type:
-          description: 'The product to check — and the product you intend to order. `stars` resolves a Stars recipient; `premium` resolves a Premium-gift recipient and uses `months`. Must match the `type` you pass to `POST /v1/orders`; a Stars check does not prove a Premium gift will be accepted (Premium has extra eligibility rules — see the endpoint description).
-
-            '
-          allOf:
-          - $ref: '#/components/schemas/OrderType'
-        recipient:
-          $ref: '#/components/schemas/Recipient'
-        months:
-          type: integer
-          enum:
-          - 3
-          - 6
-          - 12
-          description: Only meaningful for `type=premium` (defaults to 3). Must be 3, 6, or 12.
     RecipientCheckResult:
       type: object
       required:
@@ -224,14 +224,14 @@ components:
           pattern: ^@?[a-zA-Z0-9_]{1,32}$
           example: durov
   responses:
-    BadRequest:
-      description: Malformed request.
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
+    BadRequest:
+      description: Malformed request.
       content:
         application/json:
           schema:

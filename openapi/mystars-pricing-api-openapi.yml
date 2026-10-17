@@ -366,53 +366,52 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 components:
+  responses:
+    Unavailable:
+      description: 'A required source was temporarily unavailable — either the price source,
+
+        or recipient eligibility could not be verified right now. **Retryable**:
+
+        reuse the same `Idempotency-Key` and try again shortly. No order is created
+
+        and you are not charged.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
   schemas:
-    Product:
-      type: object
-      required:
-      - type
-      - name
-      - parameter
-      - min
-      - max
-      - values
-      properties:
-        type:
-          type: string
-          description: The product type — pass this as `type` to `/v1/pricing` and `/v1/orders`.
-          enum:
-          - stars
-          - premium
-        name:
-          type: string
-          description: Human-readable product name.
-          example: Telegram Stars
-        parameter:
-          type: string
-          description: 'The request field that carries the amount for this product — `quantity` for stars, `months` for premium.
-
-            '
-          enum:
-          - quantity
-          - months
-        min:
-          type: integer
-          description: Smallest buyable value (inclusive).
-          example: 50
-        max:
-          type: integer
-          description: Largest buyable value (inclusive).
-          example: 1000000
-        values:
-          type:
-          - array
-          - 'null'
-          items:
-            type: integer
-          description: 'The exact allowed values when the product is a fixed set (premium → `[3, 6, 12]`); `null` when any integer in `[min, max]` is valid (stars).
-
-            '
-          example: null
     Error:
       type: object
       required:
@@ -602,51 +601,52 @@ components:
           type: string
           format: date-time
           description: Re-quote hint — prices are locked only at order creation.
-  responses:
-    Unavailable:
-      description: 'A required source was temporarily unavailable — either the price source,
+    Product:
+      type: object
+      required:
+      - type
+      - name
+      - parameter
+      - min
+      - max
+      - values
+      properties:
+        type:
+          type: string
+          description: The product type — pass this as `type` to `/v1/pricing` and `/v1/orders`.
+          enum:
+          - stars
+          - premium
+        name:
+          type: string
+          description: Human-readable product name.
+          example: Telegram Stars
+        parameter:
+          type: string
+          description: 'The request field that carries the amount for this product — `quantity` for stars, `months` for premium.
 
-        or recipient eligibility could not be verified right now. **Retryable**:
+            '
+          enum:
+          - quantity
+          - months
+        min:
+          type: integer
+          description: Smallest buyable value (inclusive).
+          example: 50
+        max:
+          type: integer
+          description: Largest buyable value (inclusive).
+          example: 1000000
+        values:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+          description: 'The exact allowed values when the product is a fixed set (premium → `[3, 6, 12]`); `null` when any integer in `[min, max]` is valid (stars).
 
-        reuse the same `Idempotency-Key` and try again shortly. No order is created
-
-        and you are not charged.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    RateLimited:
-      description: 'A rate limit was reached — the per-minute request budget, the tighter
-
-        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
-
-        per-recipient flood guard. See **Rate limits** in the overview. The
-
-        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error:
-              code: rate_limited
-              message: rate limit exceeded
+            '
+          example: null
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

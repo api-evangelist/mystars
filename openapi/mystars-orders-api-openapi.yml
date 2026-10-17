@@ -316,83 +316,69 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 components:
-  parameters:
-    OrderId:
-      name: id
-      in: path
-      required: true
-      description: The order id (UUID, also used as the on-chain payment memo).
-      schema:
-        type: string
-        format: uuid
-    IdempotencyKey:
-      name: Idempotency-Key
-      in: header
-      required: true
-      description: 'A unique key for this create attempt. Retrying with the same key and an
+  responses:
+    Unavailable:
+      description: 'A required source was temporarily unavailable — either the price source,
 
-        identical body returns the original order; a different body is a 409.
+        or recipient eligibility could not be verified right now. **Retryable**:
+
+        reuse the same `Idempotency-Key` and try again shortly. No order is created
+
+        and you are not charged.
 
         '
-      schema:
-        type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: No such order for this tenant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid `X-Api-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 'A rate limit was reached — the per-minute request budget, the tighter
+
+        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
+
+        per-recipient flood guard. See **Rate limits** in the overview. The
+
+        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: rate_limited
+              message: rate limit exceeded
+    RecipientIneligible:
+      description: The recipient cannot receive this item. No order is created.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
-    OrderStatus:
+    OrderType:
       type: string
-      description: Lifecycle status. `awaiting_payment` is the only cancellable state.
       enum:
-      - received
-      - awaiting_payment
-      - paid
-      - reserved
-      - swapping
-      - funding
-      - purchasing
-      - fulfilling
-      - completed
-      - delivered
-      - failed
-      - reversed
-      - expired
-      - held
-      - cancelled
-    PaymentInstruction:
-      type: object
-      description: How to pay for the order. Send EXACTLY `amount` with `memo`.
-      required:
-      - currency
-      - chain
-      - pay_to_address
-      - memo
-      - amount
-      - amount_units
-      - fee
-      properties:
-        currency:
-          $ref: '#/components/schemas/PaymentCurrency'
-        chain:
-          type: string
-          example: ton
-        pay_to_address:
-          type: string
-          description: The treasury wallet to pay. The SAME address is returned for both `ton` and `usdt_ton` — a USDT jetton transfer routes by owner, so its destination is this (owner) address, not a derived jetton-wallet address.
-        memo:
-          type: string
-          description: The required transfer memo (equals the order id).
-        amount:
-          type: string
-          description: Exact amount to send, as a decimal string.
-          example: '5.757'
-        amount_units:
-          type: string
-          enum:
-          - ton
-          - usdt
-        fee:
-          description: 'For `usdt_ton` only: an itemisation of the processing fee already INCLUDED in `amount` (the 1% DEX swap fee + 0.5 GRAM swap gas we pass through). `null` for `ton` (no swap, no fee). It does NOT add to `amount` — pay exactly `amount`.'
-          oneOf:
-          - $ref: '#/components/schemas/FeeBreakdown'
-          - type: 'null'
+      - stars
+      - premium
     Error:
       type: object
       required:
@@ -430,86 +416,6 @@ components:
       - usdt_ton
       default: ton
       description: '`ton` = GRAM (ex TON), `usdt_ton` = USDT (TON).'
-    FeeBreakdown:
-      type: object
-      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
-      required:
-      - subtotal
-      - processing_fee
-      - total
-      - description
-      - currency
-      properties:
-        subtotal:
-          type: string
-          description: The item price before the processing fee, as a decimal string (USDT).
-          example: '13.18'
-        processing_fee:
-          type: string
-          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
-          example: '0.92'
-        total:
-          type: string
-          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
-          example: '14.1'
-        description:
-          type: string
-          description: Human-readable label for the fee components.
-          example: 1% swap + 0.5 GRAM gas
-        currency:
-          type: string
-          enum:
-          - usdt
-          description: The unit of the fee amounts (always `usdt`).
-    OrderType:
-      type: string
-      enum:
-      - stars
-      - premium
-    CreatedOrder:
-      type: object
-      required:
-      - order_id
-      - status
-      - type
-      - quantity
-      - months
-      - payment
-      - expires_at
-      properties:
-        order_id:
-          type: string
-          format: uuid
-        status:
-          $ref: '#/components/schemas/OrderStatus'
-        type:
-          type: string
-          description: The product this order is for — echoed back from your request.
-          enum:
-          - stars
-          - premium
-        quantity:
-          type:
-          - integer
-          - 'null'
-          description: 'The number of Stars ordered (when `type=stars`); `null` for Premium.
-
-            '
-          example: 500
-        months:
-          type:
-          - integer
-          - 'null'
-          description: 'The Premium subscription length in months ordered (when `type=premium`); `null` for Stars.
-
-            '
-          example: null
-        payment:
-          $ref: '#/components/schemas/PaymentInstruction'
-        expires_at:
-          type: string
-          format: date-time
-          description: After this, an unpaid order expires and is cleaned up.
     Order:
       type: object
       required:
@@ -574,6 +480,149 @@ components:
           - 'null'
           format: date-time
           description: Non-null only while `awaiting_payment`.
+    OrderStatus:
+      type: string
+      description: Lifecycle status. `awaiting_payment` is the only cancellable state.
+      enum:
+      - received
+      - awaiting_payment
+      - paid
+      - reserved
+      - swapping
+      - funding
+      - purchasing
+      - fulfilling
+      - completed
+      - delivered
+      - failed
+      - reversed
+      - expired
+      - held
+      - cancelled
+    PaymentInstruction:
+      type: object
+      description: How to pay for the order. Send EXACTLY `amount` with `memo`.
+      required:
+      - currency
+      - chain
+      - pay_to_address
+      - memo
+      - amount
+      - amount_units
+      - fee
+      properties:
+        currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        chain:
+          type: string
+          example: ton
+        pay_to_address:
+          type: string
+          description: The treasury wallet to pay. The SAME address is returned for both `ton` and `usdt_ton` — a USDT jetton transfer routes by owner, so its destination is this (owner) address, not a derived jetton-wallet address.
+        memo:
+          type: string
+          description: The required transfer memo (equals the order id).
+        amount:
+          type: string
+          description: Exact amount to send, as a decimal string.
+          example: '5.757'
+        amount_units:
+          type: string
+          enum:
+          - ton
+          - usdt
+        fee:
+          description: 'For `usdt_ton` only: an itemisation of the processing fee already INCLUDED in `amount` (the 1% DEX swap fee + 0.5 GRAM swap gas we pass through). `null` for `ton` (no swap, no fee). It does NOT add to `amount` — pay exactly `amount`.'
+          oneOf:
+          - $ref: '#/components/schemas/FeeBreakdown'
+          - type: 'null'
+    CreatedOrder:
+      type: object
+      required:
+      - order_id
+      - status
+      - type
+      - quantity
+      - months
+      - payment
+      - expires_at
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        type:
+          type: string
+          description: The product this order is for — echoed back from your request.
+          enum:
+          - stars
+          - premium
+        quantity:
+          type:
+          - integer
+          - 'null'
+          description: 'The number of Stars ordered (when `type=stars`); `null` for Premium.
+
+            '
+          example: 500
+        months:
+          type:
+          - integer
+          - 'null'
+          description: 'The Premium subscription length in months ordered (when `type=premium`); `null` for Stars.
+
+            '
+          example: null
+        payment:
+          $ref: '#/components/schemas/PaymentInstruction'
+        expires_at:
+          type: string
+          format: date-time
+          description: After this, an unpaid order expires and is cleaned up.
+    FeeBreakdown:
+      type: object
+      description: Itemisation of the `usdt_ton` processing fee that is ALREADY part of the all-in amount. `subtotal + processing_fee == total == amount`. Pass-through swap cost only — it does not reveal our cost basis or markup. Only `total` (= `amount`) is binding — the `subtotal`/`processing_fee` split is informational and may shift by a cent with the live FX rate.
+      required:
+      - subtotal
+      - processing_fee
+      - total
+      - description
+      - currency
+      properties:
+        subtotal:
+          type: string
+          description: The item price before the processing fee, as a decimal string (USDT).
+          example: '13.18'
+        processing_fee:
+          type: string
+          description: The 1% DEX swap fee + 0.5 GRAM swap gas, combined and rounded up to the cent, as a decimal string (USDT).
+          example: '0.92'
+        total:
+          type: string
+          description: subtotal + processing_fee — equals `amount`. Decimal string (USDT).
+          example: '14.1'
+        description:
+          type: string
+          description: Human-readable label for the fee components.
+          example: 1% swap + 0.5 GRAM gas
+        currency:
+          type: string
+          enum:
+          - usdt
+          description: The unit of the fee amounts (always `usdt`).
+    Recipient:
+      type: object
+      required:
+      - username
+      properties:
+        username:
+          type: string
+          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
+
+            '
+          pattern: ^@?[a-zA-Z0-9_]{1,32}$
+          example: durov
     CreateOrderRequest:
       type: object
       required:
@@ -602,75 +651,26 @@ components:
           type: string
           format: uri
           description: Optional HTTPS URL for the signed order-status webhook. Must be a publicly reachable `https://` URL — loopback addresses, private-network hosts, and non-HTTPS schemes are rejected with `400 bad_request`.
-    Recipient:
-      type: object
-      required:
-      - username
-      properties:
-        username:
-          type: string
-          description: 'Telegram @username (the leading `@` is optional, case-insensitive). After canonicalisation (strip `@`, lowercase) must match `[a-z0-9_]{1,32}` — invalid or oversized handles return 400.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 'A unique key for this create attempt. Retrying with the same key and an
 
-            '
-          pattern: ^@?[a-zA-Z0-9_]{1,32}$
-          example: durov
-  responses:
-    Unavailable:
-      description: 'A required source was temporarily unavailable — either the price source,
-
-        or recipient eligibility could not be verified right now. **Retryable**:
-
-        reuse the same `Idempotency-Key` and try again shortly. No order is created
-
-        and you are not charged.
+        identical body returns the original order; a different body is a 409.
 
         '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Missing or invalid `X-Api-Key`.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: Malformed request.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    RecipientIneligible:
-      description: The recipient cannot receive this item. No order is created.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    RateLimited:
-      description: 'A rate limit was reached — the per-minute request budget, the tighter
-
-        pricing/recipient-check probe cap (60 req/min), the daily order cap, or the
-
-        per-recipient flood guard. See **Rate limits** in the overview. The
-
-        per-minute-budget responses also carry `RateLimit-*` + `Retry-After` headers.
-
-        '
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error:
-              code: rate_limited
-              message: rate limit exceeded
-    NotFound:
-      description: No such order for this tenant.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
+      schema:
+        type: string
+    OrderId:
+      name: id
+      in: path
+      required: true
+      description: The order id (UUID, also used as the on-chain payment memo).
+      schema:
+        type: string
+        format: uuid
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
